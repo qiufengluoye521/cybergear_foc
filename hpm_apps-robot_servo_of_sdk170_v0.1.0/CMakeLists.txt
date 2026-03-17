@@ -1,0 +1,11 @@
+add_subdirectory(apps)
+add_subdirectory(customer)
+add_subdirectory(boards)
+add_subdirectory(components)
+add_subdirectory(middleware)
+add_subdirectory(services)
+add_subdirectory(tools)
+
+if(DEFINED USE_BGP_APP_LINKER)
+    SET(LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/middleware/hpm_bgp/framework/linker/${HPM_SOC}/segger/bgp_flash_xip.icf PARENT_SCOPE)
+endif()
