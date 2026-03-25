@@ -53,6 +53,7 @@ V4.30 : create file (state machine; handling state transition options; input fee
 /*ECATCHANGE_END(V5.13) CIA402 3*/
 
 #include "applInterface.h"
+#include "pmsm_speedctrl.h" 
 
 
 #include "coeappl.h"

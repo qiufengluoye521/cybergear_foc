@@ -5,8 +5,8 @@
  *
  */
 
-#ifndef Steppping_Motor_CurrentCtrl_H_
-#define Steppping_Motor_CurrentCtrl_H_
+#ifndef _PMSM_CURRENTCTRL_H_
+#define _PMSM_CURRENTCTRL_H_
 
 
 
@@ -24,6 +24,7 @@
 #include "pmsm_define.h"
 #include "hpm_qeiv2_drv.h"
 #include "libhpm_motor.h"
+#include "bldc_foc_callback.h"
 
 extern MOTOR_CONTROL_Global Motor_Control_Global;
 extern CMDGENE_PARA CMDGENEObj;
@@ -73,4 +74,4 @@ void motor_highspeed_loop(MOTOR_PARA* motor, MOTOR_CONTROL_Global* global, qei_C
 
 /** @} */
 
-#endif //__PMSM_CURRENTCTRL_H
+#endif //_PMSM_CURRENTCTRL_H_

@@ -5,8 +5,8 @@
  *
  */
 
-#ifndef Steppping_Motor_CurrentCtrl_H_
-#define Steppping_Motor_CurrentCtrl_H_
+#ifndef _PMSM_PROTECH_H_
+#define _PMSM_PROTECH_H_
 
 
 
@@ -42,9 +42,7 @@ typedef struct {
 
 extern MOTOR_CONTROL_PROTECT Motor_Control_Protect;
 extern void motor_protect(MOTOR_PARA *par, MOTOR_CONTROL_Global* global);
+extern void motor_protect_param_init(MOTOR_PARA *motor_par);
 
 
-
-
-
-#endif
+#endif // _PMSM_PROTECH_H_

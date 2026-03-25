@@ -55,6 +55,7 @@ void init_pwm_fault_pins(void);
 void init_uart_break_signal_pin(void);
 void init_plb_ab_pins(void);
 void init_gptmr_channel_pin(GPTMR_Type *ptr, uint32_t channel, bool as_comp);
+void init_esc_sip_pins(void);
 
 #ifdef __cplusplus
 }

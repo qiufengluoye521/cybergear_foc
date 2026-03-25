@@ -73,6 +73,8 @@ void motor_foc_angle_align(MOTOR_PARA *motor_par,MOTOR_CONTROL_Global* motor_ctr
  */
 void pmsm_motor1_init(void);
 
+void qeiv2_cfg_init(void);
+
 
 /** @} */
 

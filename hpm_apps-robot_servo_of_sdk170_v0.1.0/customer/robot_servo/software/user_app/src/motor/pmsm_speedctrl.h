@@ -5,8 +5,8 @@
  *
  */
 
-#ifndef Steppping_Motor_SpeedCtrl_H_
-#define Steppping_Motor_SpeedCtrl_H_
+#ifndef __PMSM_SPEEDTCTRL_H
+#define __PMSM_SPEEDTCTRL_H
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -26,6 +26,9 @@
 #include "pmsm_protect.h"
 #include "data_trans.h"
 #include "libhpm_motor.h"
+#include "pmsm_init.h"
+#include "pmsm_protect.h"
+#include "bldc_foc_callback.h"
 /**
  * @brief PMSM SPEEDCTRL API ;速度控制接口函数
  * @addtogroup PMSM_SPEEDTCTRL_API
@@ -73,6 +76,15 @@ void speedloop_ctrl(MOTOR_PARA *par, PWMV2_Type *ptr, uint8_t Motor_COntrol_Word
  * @param[in]    qei_CalHdl    encoder struct;编码器结构体
  */
 void positionloop_ctrl(MOTOR_PARA *par, PWMV2_Type *ptr,uint8_t Motor_COntrol_Word, CMDGENE_PARA* CMDGENEObj,qei_CalObj* qei_CalHdl );
+
+void motor_enable(void);
+void motor_disable(void);
+void motor_position_loop_set(int32_t target_position);
+void motor_speed_loop_set(int32_t target_speed);
+int32_t motor_get_actual_speed(void);
+int32_t motor_get_actual_position(void);
+void motor_postion_loop_init(void);
+void motor_speed_loop_init(void);
 
 /** @} */
 

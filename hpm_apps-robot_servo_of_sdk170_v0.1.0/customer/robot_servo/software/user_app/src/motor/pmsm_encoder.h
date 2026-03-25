@@ -5,8 +5,8 @@
  *
  */
 
-#ifndef Steppping_Motor_CurrentCtrl_H_
-#define Steppping_Motor_CurrentCtrl_H_
+#ifndef _PMSM_ENCODER_H_
+#define _PMSM_ENCODER_H_
 
 
 
@@ -43,12 +43,8 @@ typedef struct {
     int32_t pos;
 }spi_CalObj;
 
-
-
 extern void electric_angle_cal(qei_CalObj* qei_CalHdl,MOTOR_CONTROL_Global* global);
+extern void motor_encoder_spi_elecinit(MOTOR_CONTROL_Global* global);
 
 
-
-
-
-#endif
+#endif //_PMSM_ENCODER_H_

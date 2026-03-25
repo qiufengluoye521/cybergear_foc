@@ -5,8 +5,8 @@
  *
  */
 
-#ifndef Steppping_Motor_CurrentCtrl_H_
-#define Steppping_Motor_CurrentCtrl_H_
+#ifndef _PMSM_CURRENTCTRL_H
+#define _PMSM_CURRENTCTRL_H
 
 
 
@@ -56,4 +56,4 @@ void motor_highspeed_loop(MOTOR_PARA* motor,MOTOR_CONTROL_Global* global,qei_Cal
 
 /** @} */
 
-#endif //__PMSM_CURRENTCTRL_H
+#endif //_PMSM_CURRENTCTRL_H

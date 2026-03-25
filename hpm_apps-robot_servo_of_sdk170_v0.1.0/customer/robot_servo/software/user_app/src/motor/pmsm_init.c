@@ -58,7 +58,7 @@ void adc_module_cfg(adc_type* adc_typ,uint8_t adc_module,ADC16_Type* HPM_ADC_BAS
  * ***************************************/
 void pi_param_init(BLDC_CONTRL_PID_PARA *par, float KP, float KI, float MAX)
 {
-    par->func_pid  = hpm_mcl_bldc_foc_pi_contrl;
+    par->func_pid  = (void*)hpm_mcl_bldc_foc_pi_contrl;
     par->i_kp      = HPM_MOTOR_MATH_FL_MDF(KP);
     par->i_ki      = HPM_MOTOR_MATH_FL_MDF(KI);
     par->i_max     = HPM_MOTOR_MATH_FL_MDF(MAX);
@@ -86,26 +86,26 @@ void motor_param_int(MOTOR_PARA *motor_par, uint8_t MOTOR_ID)
     motor_par->foc_para.speedcalpar.i_speedfilter = 0.1;
     motor_par->foc_para.speedcalpar.i_speedlooptime_s = HPM_MOTOR_MATH_FL_MDF(0.00005*20);//*20
     motor_par->foc_para.speedcalpar.i_motorpar = &motor_par->foc_para.motorpar;
-    motor_par->foc_para.speedcalpar.func_getspd = hpm_mcl_bldc_foc_al_speed;
+    motor_par->foc_para.speedcalpar.func_getspd = (void*)hpm_mcl_bldc_foc_al_speed;
 
     motor_par->foc_para.currentdpipar.i_kp = 0.5;//0.5
     motor_par->foc_para.currentdpipar.i_ki = 0.02;
     motor_par->foc_para.currentdpipar.i_max = HPM_MOTOR_MATH_FL_MDF(4000);//5000 0k
-    motor_par->foc_para.currentdpipar.func_pid = hpm_mcl_bldc_foc_pi_contrl;
+    motor_par->foc_para.currentdpipar.func_pid = (void*)hpm_mcl_bldc_foc_pi_contrl;
 
     motor_par->foc_para.currentqpipar.i_kp = 0.5;//0.5
     motor_par->foc_para.currentqpipar.i_ki = 0.02;
     motor_par->foc_para.currentqpipar.i_max = HPM_MOTOR_MATH_FL_MDF(7000);//5000 ok
-    motor_par->foc_para.currentqpipar.func_pid = hpm_mcl_bldc_foc_pi_contrl;
+    motor_par->foc_para.currentqpipar.func_pid = (void*)hpm_mcl_bldc_foc_pi_contrl;
 
-    motor_par->foc_para.pwmpar.func_spwm = hpm_mcl_bldc_foc_svpwm;
+    motor_par->foc_para.pwmpar.func_spwm = (void*)hpm_mcl_bldc_foc_svpwm;
     motor_par->foc_para.pwmpar.i_pwm_reload_max = PWM_RELOAD*0.95;
-    motor_par->foc_para.pwmpar.pwmout.func_set_pwm = bldc_foc_pwmset;
+    motor_par->foc_para.pwmpar.pwmout.func_set_pwm = (void*)bldc_foc_pwmset;
     motor_par->foc_para.pwmpar.pwmout.i_pwm_reload = PWM_RELOAD;
     motor_par->foc_para.pwmpar.pwmout.i_motor_id = MOTOR_ID;
 
-    motor_par->foc_para.samplcurpar.func_sampl = hpm_mcl_bldc_foc_current_cal;
-    motor_par->foc_para.func_dqsvpwm =  hpm_mcl_bldc_foc_ctrl_dq_to_pwm;
+    motor_par->foc_para.samplcurpar.func_sampl = (void*)hpm_mcl_bldc_foc_current_cal;
+    motor_par->foc_para.func_dqsvpwm =  (void*)hpm_mcl_bldc_foc_ctrl_dq_to_pwm;
     
     motor_par->adc_trig_event_callback = &motor_highspeed_loop;
 }
@@ -207,7 +207,7 @@ void pwmv2_trigfor_adc_init(PWMV2_Type *ptr, uint32_t PWM_PRD, uint32_t PWM_CNT,
     pwm_cfg.pwm[0].enable_four_cmp = false;
     pwm_cfg.pwm[0].update_trigger = CMP_PWM_REGISTER_UPDATE_TYPE;
     pwm_cfg.pwm[0].dead_zone_in_half_cycle = PWM_DEAD_AREA_TICK;
-    pwmv2_config_pwm(ptr, PWM_CH_TRIG_ADC, &pwm_cfg, false);
+    pwmv2_config_pwm(ptr, PWM_CH_TRIG_ADC, &pwm_cfg.pwm[0], false);
 
     pwmv2_select_cmp_source(ptr, PWM_CH_TRIG_ADC, CMP_SOURCE, PWMV2_SHADOW_INDEX(9));
     pwmv2_set_trigout_cmp_index(ptr, PWM_TRIGOUT_CH_ADC, PWM_CH_TRIG_ADC);
@@ -242,7 +242,7 @@ void pwmv2_trigfor_currentctrl_init(PWMV2_Type *ptr, uint32_t PWM_PRD, uint32_t 
     pwm_cfg.pwm[0].enable_four_cmp = false;
     pwm_cfg.pwm[0].update_trigger = CMP_PWM_REGISTER_UPDATE_TYPE;
     pwm_cfg.pwm[0].dead_zone_in_half_cycle = PWM_DEAD_AREA_TICK;
-    pwmv2_config_pwm(ptr, PWM_CH_TRIG_CUREENTCTRL, &pwm_cfg, false);
+    pwmv2_config_pwm(ptr, PWM_CH_TRIG_CUREENTCTRL, &pwm_cfg.pwm[0], false);
 
     pwmv2_select_cmp_source(ptr, PWM_CH_TRIG_CUREENTCTRL, CMP_SOURCE, PWMV2_SHADOW_INDEX(10));
     pwmv2_set_trigout_cmp_index(ptr, PWM_TRIGOUT_CH_CUREENTCTRL, PWM_CH_TRIG_CUREENTCTRL);
@@ -406,7 +406,7 @@ void qeiv2_cfg_init(void)
 
     intc_m_enable_irq_with_priority(BOARD_PMSM0_QEI_IRQ, 1);
 
-    qeiv2_set_phcnt_cmp_value(BOARD_PMSM0_QEI_IRQ, 4);
+    qeiv2_set_phcnt_cmp_value(BOARD_PMSM0_QEI_BASE, 4);
 
     qeiv2_set_cmp2_match_option(BOARD_PMSM0_QEI_BASE, true, false, true, true, true, true, true);
     qeiv2_enable_load_read_trigger_event(BOARD_PMSM0_QEI_BASE, QEIV2_EVENT_POSITION_COMPARE_FLAG_MASK);

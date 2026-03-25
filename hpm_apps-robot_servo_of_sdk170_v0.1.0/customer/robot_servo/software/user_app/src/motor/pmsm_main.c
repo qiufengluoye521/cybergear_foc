@@ -26,6 +26,8 @@
 #include "pmsm_currentctrl.h"
 #include "libhpm_motor.h"
 #include "hpm_qeiv2_drv.h"
+#include "monitor.h"
+#include "pmsm_main.h"
 
 extern MOTOR_CONTROL_Global Motor_Control_Global;
 

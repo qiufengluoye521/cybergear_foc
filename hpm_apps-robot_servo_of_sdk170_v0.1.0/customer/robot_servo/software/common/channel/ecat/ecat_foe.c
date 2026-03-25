@@ -19,6 +19,7 @@
 
 #include "ecat_foe.h"
 #include "cia402appl.h"
+#include "pmsm_main.h"
 
 extern bool foe_reset_request;
 

@@ -29,7 +29,7 @@ void motor_encoder_spi_elecinit(MOTOR_CONTROL_Global* global)
     control_config.master_config.cmd_enable = false;  /* cmd phase control for master */
     control_config.master_config.addr_enable = false; /* address phase control for master */
     control_config.common_config.trans_mode = spi_trans_write_read_together;//spi_trans_write_read_together;
-    spi_transfer(BOARD_APP_SPI_BASE, &control_config, NULL, NULL, (uint16_t *)wbuff, ARRAY_SIZE(wbuff), (uint16_t *)rbuff, ARRAY_SIZE(rbuff));
+    spi_transfer(BOARD_APP_SPI_BASE, &control_config, NULL, NULL, (uint8_t *)wbuff, ARRAY_SIZE(wbuff), (uint8_t *)rbuff, ARRAY_SIZE(rbuff));
  
     m_pos = rbuff[0] & 0x3FFF;
     global->Motor_ElecInit = (float)(m_pos);//(float)(m_pos % 1170) / (float)1170 * 360.0;
@@ -86,7 +86,7 @@ void motor_encoder_spi(MOTOR_CONTROL_Global* global)
     control_config.master_config.cmd_enable = false;  /* cmd phase control for master */
     control_config.master_config.addr_enable = false; /* address phase control for master */
     control_config.common_config.trans_mode = spi_trans_write_read_together;//spi_trans_write_read_together;
-    spi_transfer(BOARD_APP_SPI_BASE, &control_config, NULL, NULL, (uint16_t *)wbuff, ARRAY_SIZE(wbuff), (uint16_t *)rbuff, ARRAY_SIZE(rbuff));
+    spi_transfer(BOARD_APP_SPI_BASE, &control_config, NULL, NULL, (uint8_t *)wbuff, ARRAY_SIZE(wbuff), (uint8_t *)rbuff, ARRAY_SIZE(rbuff));
 
     m_pos = rbuff[0] & 0x3FFF;
     m_pos_cal = (float)m_pos;

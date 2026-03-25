@@ -220,7 +220,7 @@ void motor_protect(MOTOR_PARA *par, MOTOR_CONTROL_Global* global)
     //printf("Period Mode - %s [channel %02d] - Result: 0x%04x\n", BOARD_APP_ADC16_NAME, BOARD_APP_ADC16_CH_1, result);
     motor_protect_voltage(m_voltage_result, &Motor_Control_Protect);
     motor_protect_current(par, &Motor_Control_Protect);
-    motor_protect_speed(par, &Motor_Control_Protect, &global);
+    motor_protect_speed(par, &Motor_Control_Protect, global);
     motor_protect_temp(m_temp_result, &Motor_Control_Protect);
     motor_operation_led_ctrl(&Motor_Control_Protect);
 

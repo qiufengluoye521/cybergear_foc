@@ -52,6 +52,7 @@ void positionloop_ctrl(MOTOR_PARA *par, PWMV2_Type *ptr, uint8_t Motor_COntrol_W
       par->foc_para.currentqpipar.target =  par->speedloop_para.outval;
       par->foc_para.currentdpipar.target =  0;
 }
+
 /**********************************************
  * *void motor_foc_angle_align()
  * * when ABZ encoder is used, prepositioning is must be applied in power on

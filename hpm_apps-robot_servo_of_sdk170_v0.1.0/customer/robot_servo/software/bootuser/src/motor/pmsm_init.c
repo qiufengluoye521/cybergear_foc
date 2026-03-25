@@ -207,7 +207,7 @@ void pwmv2_trigfor_adc_init(PWMV2_Type *ptr, uint32_t PWM_PRD, uint32_t PWM_CNT,
     pwm_cfg.pwm[0].enable_four_cmp = false;
     pwm_cfg.pwm[0].update_trigger = CMP_PWM_REGISTER_UPDATE_TYPE;
     pwm_cfg.pwm[0].dead_zone_in_half_cycle = PWM_DEAD_AREA_TICK;
-    pwmv2_config_pwm(ptr, PWM_CH_TRIG_ADC, &pwm_cfg, false);
+    pwmv2_config_pwm(ptr, PWM_CH_TRIG_ADC, &pwm_cfg.pwm[0], false);
 
     pwmv2_select_cmp_source(ptr, PWM_CH_TRIG_ADC, CMP_SOURCE, PWMV2_SHADOW_INDEX(9));
     pwmv2_set_trigout_cmp_index(ptr, PWM_TRIGOUT_CH_ADC, PWM_CH_TRIG_ADC);
@@ -241,7 +241,7 @@ void pwmv2_trigfor_currentctrl_init(PWMV2_Type *ptr, uint32_t PWM_PRD, uint32_t 
     pwm_cfg.pwm[0].enable_four_cmp = false;
     pwm_cfg.pwm[0].update_trigger = CMP_PWM_REGISTER_UPDATE_TYPE;
     pwm_cfg.pwm[0].dead_zone_in_half_cycle = PWM_DEAD_AREA_TICK;
-    pwmv2_config_pwm(ptr, PWM_CH_TRIG_CUREENTCTRL, &pwm_cfg, false);
+    pwmv2_config_pwm(ptr, PWM_CH_TRIG_CUREENTCTRL, &pwm_cfg.pwm[0], false);
 
     pwmv2_select_cmp_source(ptr, PWM_CH_TRIG_CUREENTCTRL, CMP_SOURCE, PWMV2_SHADOW_INDEX(10));
     pwmv2_set_trigout_cmp_index(ptr, PWM_TRIGOUT_CH_CUREENTCTRL, PWM_CH_TRIG_CUREENTCTRL);
@@ -498,6 +498,27 @@ void pwm_pins_init(PWMV2_Type *ptr)
 
     
 
+void qeiv2_cfg_init(void)
+{
+    qeiv2_reset_counter(BOARD_PMSM0_QEI_BASE);
+
+    qeiv2_set_work_mode(BOARD_PMSM0_QEI_BASE, qeiv2_work_mode_abz);
+
+    qeiv2_config_z_phase_counter_mode(BOARD_PMSM0_QEI_BASE, qeiv2_z_count_inc_on_phase_count_max);
+    qeiv2_config_phmax_phparam(BOARD_PMSM0_QEI_BASE, BOARD_PMSM0_QEI_FOC_PHASE_COUNT_PER_REV);
+
+
+    intc_m_enable_irq_with_priority(BOARD_PMSM0_QEI_IRQ, 1);
+
+    qeiv2_set_phcnt_cmp_value(BOARD_PMSM0_QEI_BASE, 4);
+
+    qeiv2_set_cmp2_match_option(BOARD_PMSM0_QEI_BASE, true, false, true, true, true, true, true);
+    qeiv2_enable_load_read_trigger_event(BOARD_PMSM0_QEI_BASE, QEIV2_EVENT_POSITION_COMPARE_FLAG_MASK);
+
+
+    qeiv2_release_counter(BOARD_PMSM0_QEI_BASE);
+
+}
 
 
 
@@ -577,27 +598,6 @@ void qeiv2_pins_init(PWMV2_Type *ptr)
 }
 
 
-void qeiv2_cfg_init(void)
-{
-    qeiv2_reset_counter(BOARD_PMSM0_QEI_BASE);
-
-    qeiv2_set_work_mode(BOARD_PMSM0_QEI_BASE, qeiv2_work_mode_abz);
-
-    qeiv2_config_z_phase_counter_mode(BOARD_PMSM0_QEI_BASE, qeiv2_z_count_inc_on_phase_count_max);
-    qeiv2_config_phmax_phparam(BOARD_PMSM0_QEI_BASE, BOARD_PMSM0_QEI_FOC_PHASE_COUNT_PER_REV);
-
-
-    intc_m_enable_irq_with_priority(BOARD_PMSM0_QEI_IRQ, 1);
-
-    qeiv2_set_phcnt_cmp_value(BOARD_PMSM0_QEI_IRQ, 4);
-
-    qeiv2_set_cmp2_match_option(BOARD_PMSM0_QEI_BASE, true, false, true, true, true, true, true);
-    qeiv2_enable_load_read_trigger_event(BOARD_PMSM0_QEI_BASE, QEIV2_EVENT_POSITION_COMPARE_FLAG_MASK);
-
-
-    qeiv2_release_counter(BOARD_PMSM0_QEI_BASE);
-
-}
 
 
 

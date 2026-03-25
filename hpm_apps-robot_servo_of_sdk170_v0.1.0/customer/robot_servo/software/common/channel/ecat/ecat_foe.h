@@ -18,6 +18,8 @@ extern "C" {
 
 int hpm_ecat_foe_init(void);
 int hpm_ecat_foe_task(void);
+int hpm_ecat_cia402_foe_init(void);
+int hpm_ecat_cia402_foe_task(void);
 
 #ifdef __cplusplus
 }
