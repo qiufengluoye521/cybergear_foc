@@ -58,6 +58,15 @@ void speedloop_ctrl(MOTOR_PARA *par, PWMV2_Type *ptr, uint8_t Motor_COntrol_Word
  */
 void positionloop_ctrl(MOTOR_PARA *par, PWMV2_Type *ptr,uint8_t Motor_COntrol_Word,CMDGENE_Obj* CMDGENEObj,qei_CalObj* qei_CalHdl );
 
+void motor_enable(void);
+void motor_disable(void);
+void motor_position_loop_set(int32_t target_position);
+void motor_speed_loop_set(int32_t target_speed);
+int32_t motor_get_actual_speed(void);
+int32_t motor_get_actual_position(void);
+void motor_postion_loop_init(void);
+void motor_speed_loop_init(void);
+
 /** @} */
 
 #endif //__PMSM_SPEEDTCTRL_H

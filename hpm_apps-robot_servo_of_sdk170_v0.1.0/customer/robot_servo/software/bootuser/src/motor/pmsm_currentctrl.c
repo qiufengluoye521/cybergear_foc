@@ -7,6 +7,7 @@
 //#include "hpm_qei_drv.h"
 
 #include "hpm_qeiv2_drv.h"
+#include "bldc_foc_callback.h"
 ATTR_PLACE_AT_NONCACHEABLE_WITH_ALIGNMENT(ADC_SOC_DMA_ADDR_ALIGNMENT) uint32_t adc_buff[3][BOARD_BLDC_ADC_SEQ_DMA_SIZE_IN_4BYTES];
 
 /**

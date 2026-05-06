@@ -7,6 +7,7 @@
 
 #include "cmd_gene.h"
 #include "hpm_qeiv2_drv.h"
+#include "bldc_foc_callback.h"
 
 
 void speedloop_ctrl(MOTOR_PARA *par, PWMV2_Type *ptr, uint8_t Motor_COntrol_Word,CMDGENE_Obj* CMDGENEObj )

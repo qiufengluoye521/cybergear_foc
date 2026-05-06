@@ -19,6 +19,7 @@
 #include "hpm_qeiv2_drv.h"
 #include "bldc_foc_callback.h"
 #include "hpm_gpio_drv.h"
+#include "libhpm_motor.h"
 
 
 
@@ -54,7 +55,7 @@ void adc_module_cfg(adc_type* adc_typ,uint8_t adc_module,ADC16_Type* HPM_ADC_BAS
  */
 void pi_param_init(BLDC_CONTRL_PID_PARA *par, float KP, float KI, float MAX)
 {
-    par->func_pid  = hpm_mcl_bldc_foc_pi_contrl;
+    par->func_pid  = (void*)hpm_mcl_bldc_foc_pi_contrl;
     par->i_kp      = HPM_MOTOR_MATH_FL_MDF(KP);
     par->i_ki      = HPM_MOTOR_MATH_FL_MDF(KI);
     par->i_max     = HPM_MOTOR_MATH_FL_MDF(MAX);
@@ -84,26 +85,26 @@ void motor_param_int(MOTOR_PARA *motor_par, uint8_t MOTOR_ID)
     motor_par->foc_para.speedcalpar.i_speedfilter = 0.1;
     motor_par->foc_para.speedcalpar.i_speedlooptime_s = HPM_MOTOR_MATH_FL_MDF(0.00005*20);//*20
     motor_par->foc_para.speedcalpar.i_motorpar = &motor_par->foc_para.motorpar;
-    motor_par->foc_para.speedcalpar.func_getspd = hpm_mcl_bldc_foc_al_speed;
+    motor_par->foc_para.speedcalpar.func_getspd = (void*)hpm_mcl_bldc_foc_al_speed;
 
     motor_par->foc_para.currentdpipar.i_kp = 0.5;//0.5
     motor_par->foc_para.currentdpipar.i_ki = 0.02;
     motor_par->foc_para.currentdpipar.i_max = HPM_MOTOR_MATH_FL_MDF(4000);//5000 0k
-    motor_par->foc_para.currentdpipar.func_pid = hpm_mcl_bldc_foc_pi_contrl;
+    motor_par->foc_para.currentdpipar.func_pid = (void*)hpm_mcl_bldc_foc_pi_contrl;
 
     motor_par->foc_para.currentqpipar.i_kp = 0.5;//0.5
     motor_par->foc_para.currentqpipar.i_ki = 0.02;
     motor_par->foc_para.currentqpipar.i_max = HPM_MOTOR_MATH_FL_MDF(7000);//5000 ok
-    motor_par->foc_para.currentqpipar.func_pid = hpm_mcl_bldc_foc_pi_contrl;
+    motor_par->foc_para.currentqpipar.func_pid = (void*)hpm_mcl_bldc_foc_pi_contrl;
 
-    motor_par->foc_para.pwmpar.func_spwm = hpm_mcl_bldc_foc_svpwm;
+    motor_par->foc_para.pwmpar.func_spwm = (void*)hpm_mcl_bldc_foc_svpwm;
     motor_par->foc_para.pwmpar.i_pwm_reload_max = PWM_RELOAD*0.95;
-    motor_par->foc_para.pwmpar.pwmout.func_set_pwm = bldc_foc_pwmset;
+    motor_par->foc_para.pwmpar.pwmout.func_set_pwm = (void*)bldc_foc_pwmset;
     motor_par->foc_para.pwmpar.pwmout.i_pwm_reload = PWM_RELOAD;
     motor_par->foc_para.pwmpar.pwmout.i_motor_id = MOTOR_ID;
 
-    motor_par->foc_para.samplcurpar.func_sampl = hpm_mcl_bldc_foc_current_cal;
-    motor_par->foc_para.func_dqsvpwm =  hpm_mcl_bldc_foc_ctrl_dq_to_pwm;
+    motor_par->foc_para.samplcurpar.func_sampl = (void*)hpm_mcl_bldc_foc_current_cal;
+    motor_par->foc_para.func_dqsvpwm = (void*)hpm_mcl_bldc_foc_ctrl_dq_to_pwm;
     
     motor_par->adc_trig_event_callback = &motor_highspeed_loop;
 
@@ -256,87 +257,152 @@ void pwmv2_trigfor_currentctrl_init(PWMV2_Type *ptr, uint32_t PWM_PRD, uint32_t 
 
 void pwm_duty_init(PWMV2_Type *ptr, uint32_t PWM_PRD, uint8_t CMP_SHADOW_REGISTER_UPDATE_TYPE, uint8_t CMP_COMPARE)
 {
-    uint8_t cmp_index = BOARD_PMSM0PWM_CMP_INDEX_0;
-    pwmv2_cmp_config_t cmp_config[4] = {0};
-    pwmv2_pair_config_t pwm_pair_config = {0};
-    pwm_output_channel_t pwm_output_ch_cfg;
+   // uint8_t cmp_index = BOARD_PMSM0PWM_CMP_INDEX_0;
+   // pwmv2_cmp_config_t cmp_config[4] = {0};
+   // pwmv2_pair_config_t pwm_pair_config = {0};
+   // pwm_output_channel_t pwm_output_ch_cfg;
 
-    pwm_stop_counter(ptr);
+   // //pwm_stop_counter(ptr);
+   // /* 1. 停止计数器 */
+   // /* 在 PWMV2 中，使用 disable 函数停止指定的计数器（假设为计数器 0） */
+   // pwmv2_disable_counter(ptr, pwm_counter_0);
 
-    pwm_set_reload(ptr, 0, PWM_PRD);
-    pwm_set_start_count(ptr, 0, 0);
-  
-    cmp_config[0].mode = CMP_COMPARE;
-    cmp_config[0].cmp = PWM_PRD + 1;
-    cmp_config[0].update_trigger = CMP_SHADOW_REGISTER_UPDATE_TYPE;
+   // //pwm_set_reload(ptr, 0, PWM_PRD);
+   // //pwm_set_start_count(ptr, 0, 0);
+   // /* 2. 设置重载值（周期） */
+   // /* PWMV2 通过影子寄存器设置周期。通常影子寄存器 0 默认关联计数器 0 的重载值 */
+   // /* 参数说明：ptr, 影子寄存器索引, 周期值, 高精度分量, 是否半周期更新 */
+   // pwmv2_set_shadow_val(ptr, 0, PWM_PRD, 0, false);
 
-    cmp_config[1].mode = CMP_COMPARE;
-    cmp_config[1].cmp = PWM_PRD + 1;
-    cmp_config[1].update_trigger = CMP_SHADOW_REGISTER_UPDATE_TYPE;
+   // /* 3. 设置计数器起始值 */
+   // /* PWMV2 提供了直接重置计数器的接口，将其清零 */
+   // pwmv2_reset_counter(ptr, pwm_counter_0);
 
-    pwm_get_default_pwm_pair_config(ptr, &pwm_pair_config);
-    pwm_pair_config.pwm[0].enable_output = true;
-    pwm_pair_config.pwm[0].dead_zone_in_half_cycle = 100;
-    pwm_pair_config.pwm[0].invert_output = false;
+   // /* 4. 配置比较器基础模板 */
+   // /* PWMV2 中比较器配置与通道对是解耦的 */  
+   // cmp_config[0].mode = CMP_COMPARE;
+   // cmp_config[0].cmp = PWM_PRD + 1;
+   // cmp_config[0].update_trigger = CMP_SHADOW_REGISTER_UPDATE_TYPE;
 
-    pwm_pair_config.pwm[1].enable_output = true;
-    pwm_pair_config.pwm[1].dead_zone_in_half_cycle = 100;
-    pwm_pair_config.pwm[1].invert_output = false;
+   // cmp_config[1].mode = CMP_COMPARE;
+   // cmp_config[1].cmp = PWM_PRD + 1;
+   // cmp_config[1].update_trigger = CMP_SHADOW_REGISTER_UPDATE_TYPE;
 
-    {  
-   /*     if (status_success != pwm_setup_waveform_in_pair(ptr, BOARD_PMSM0_UH_PWM_OUTPIN, &pwm_pair_config, cmp_index, &cmp_config[0], 2)) {
-            printf("failed to setup waveform\n");
-            while(1);
-        }
-        if (status_success != pwm_setup_waveform_in_pair(ptr, BOARD_PMSM0_VH_PWM_OUTPIN, &pwm_pair_config, cmp_index+4, &cmp_config[0], 2)) {
-            printf("failed to setup waveform\n");
-            while(1);
-        }
-        if (status_success != pwm_setup_waveform_in_pair(ptr, BOARD_PMSM0_WH_PWM_OUTPIN, &pwm_pair_config, cmp_index+6, &cmp_config[0], 2)) {
-            printf("failed to setup waveform\n");
-            while(1);
-        }
-    */
-        if (status_success != pwm_setup_waveform_in_pair(ptr, BOARD_PMSM0_UH_PWM_OUTPIN, &pwm_pair_config, cmp_index, &cmp_config[0], 2)) {
-            printf("failed to setup waveform\n");
-            while(1);
-        }
-        if (status_success != pwm_setup_waveform_in_pair(ptr, BOARD_PMSM0_VH_PWM_OUTPIN, &pwm_pair_config, cmp_index-2, &cmp_config[0], 2)) {
-            printf("failed to setup waveform\n");
-            while(1);
-        }
-        if (status_success != pwm_setup_waveform_in_pair(ptr, BOARD_PMSM0_WH_PWM_OUTPIN, &pwm_pair_config, cmp_index-4, &cmp_config[0], 2)) {
-            printf("failed to setup waveform\n");
-            while(1);
-        }  
-    }
-    pwm_enable_output(ptr, BOARD_PMSM0_UH_PWM_OUTPIN);
-    pwm_enable_output(ptr, BOARD_PMSM0_UL_PWM_OUTPIN);
-    pwm_enable_output(ptr, BOARD_PMSM0_VH_PWM_OUTPIN);
-    pwm_enable_output(ptr, BOARD_PMSM0_VL_PWM_OUTPIN);
-    pwm_enable_output(ptr, BOARD_PMSM0_WH_PWM_OUTPIN);
-    pwm_enable_output(ptr, BOARD_PMSM0_WL_PWM_OUTPIN);
+   // /* 5. 配置通道对 (PWM Pair) 属性 */
+   // /* 代替 pwm_get_default_pwm_pair_config */
+   // //pwm_pair_config.pwm_output_mode = pwmv2_output_independent; 
+   // pwm_pair_config.pwm[0].enable_output = true;
+   // pwm_pair_config.pwm[0].dead_zone_in_half_cycle = 100;
+   // pwm_pair_config.pwm[0].invert_output = false;
+   // pwm_pair_config.pwm[1].enable_output = true;
+   // pwm_pair_config.pwm[1].dead_zone_in_half_cycle = 100;
+   // pwm_pair_config.pwm[1].invert_output = false;
+
+   // //pwm_get_default_pwm_pair_config(ptr, &pwm_pair_config);
+   // //pwm_pair_config.pwm[0].enable_output = true;
+   // //pwm_pair_config.pwm[0].dead_zone_in_half_cycle = 100;
+   // //pwm_pair_config.pwm[0].invert_output = false;
+
+   // //pwm_pair_config.pwm[1].enable_output = true;
+   // //pwm_pair_config.pwm[1].dead_zone_in_half_cycle = 100;
+   // //pwm_pair_config.pwm[1].invert_output = false;
+
+   // {  
+   ///*     if (status_success != pwm_setup_waveform_in_pair(ptr, BOARD_PMSM0_UH_PWM_OUTPIN, &pwm_pair_config, cmp_index, &cmp_config[0], 2)) {
+   //         printf("failed to setup waveform\n");
+   //         while(1);
+   //     }
+   //     if (status_success != pwm_setup_waveform_in_pair(ptr, BOARD_PMSM0_VH_PWM_OUTPIN, &pwm_pair_config, cmp_index+4, &cmp_config[0], 2)) {
+   //         printf("failed to setup waveform\n");
+   //         while(1);
+   //     }
+   //     if (status_success != pwm_setup_waveform_in_pair(ptr, BOARD_PMSM0_WH_PWM_OUTPIN, &pwm_pair_config, cmp_index+6, &cmp_config[0], 2)) {
+   //         printf("failed to setup waveform\n");
+   //         while(1);
+   //     }
+   // */
+   //     //if (status_success != pwm_setup_waveform_in_pair(ptr, BOARD_PMSM0_UH_PWM_OUTPIN, &pwm_pair_config, cmp_index, &cmp_config[0], 2)) {
+   //     //    printf("failed to setup waveform\n");
+   //     //    while(1);
+   //     //}
+   //     //if (status_success != pwm_setup_waveform_in_pair(ptr, BOARD_PMSM0_VH_PWM_OUTPIN, &pwm_pair_config, cmp_index-2, &cmp_config[0], 2)) {
+   //     //    printf("failed to setup waveform\n");
+   //     //    while(1);
+   //     //}
+   //     //if (status_success != pwm_setup_waveform_in_pair(ptr, BOARD_PMSM0_WH_PWM_OUTPIN, &pwm_pair_config, cmp_index-4, &cmp_config[0], 2)) {
+   //     //    printf("failed to setup waveform\n");
+   //     //    while(1);
+   //     //}  
+   // }
+
+   // /* 6. 设置波形配置 (替代 pwm_setup_waveform_in_pair) */
+   // /* 注意：PWMV2 使用索引号直接操作，BOARD_PMSM0_xH_PWM_OUTPIN 需对应通道索引 */
+    
+   // // U 相配置 (假设 pin 对应 pair 索引)
+   // pwmv2_setup_waveform_in_pair(ptr, BOARD_PMSM0_UH_PWM_OUTPIN >> 1, &pwm_pair_config);
+   // pwmv2_config_cmp(ptr, BOARD_PMSM0PWM_CMP_INDEX_0, &cmp_config);
+   // pwmv2_config_cmp(ptr, BOARD_PMSM0PWM_CMP_INDEX_0 + 1, &cmp_config);
+
+   // // V 相配置
+   // pwmv2_setup_waveform_in_pair(ptr, BOARD_PMSM0_VH_PWM_OUTPIN >> 1, &pwm_pair_config);
+   // pwmv2_config_cmp(ptr, BOARD_PMSM0PWM_CMP_INDEX_0 + 2, &cmp_config);
+   // pwmv2_config_cmp(ptr, BOARD_PMSM0PWM_CMP_INDEX_0 + 3, &cmp_config);
+
+   // // W 相配置
+   // pwmv2_setup_waveform_in_pair(ptr, BOARD_PMSM0_WH_PWM_OUTPIN >> 1, &pwm_pair_config);
+   // pwmv2_config_cmp(ptr, BOARD_PMSM0PWM_CMP_INDEX_0 + 4, &cmp_config);
+   // pwmv2_config_cmp(ptr, BOARD_PMSM0PWM_CMP_INDEX_0 + 5, &cmp_config);
+
+   // //pwm_enable_output(ptr, BOARD_PMSM0_UH_PWM_OUTPIN);
+   // //pwm_enable_output(ptr, BOARD_PMSM0_UL_PWM_OUTPIN);
+   // //pwm_enable_output(ptr, BOARD_PMSM0_VH_PWM_OUTPIN);
+   // //pwm_enable_output(ptr, BOARD_PMSM0_VL_PWM_OUTPIN);
+   // //pwm_enable_output(ptr, BOARD_PMSM0_WH_PWM_OUTPIN);
+   // //pwm_enable_output(ptr, BOARD_PMSM0_WL_PWM_OUTPIN);
+
+   // /* 7. 使能输出 (替代 pwm_enable_output) */
+   // /* PWMV2 中通过控制各通道的使能位实现 */
+   // pwmv2_channel_enable_output(ptr, BOARD_PMSM0_UH_PWM_OUTPIN);
+   // pwmv2_channel_enable_output(ptr, BOARD_PMSM0_UL_PWM_OUTPIN);
+   // pwmv2_channel_enable_output(ptr, BOARD_PMSM0_VH_PWM_OUTPIN);
+   // pwmv2_channel_enable_output(ptr, BOARD_PMSM0_VL_PWM_OUTPIN);
+   // pwmv2_channel_enable_output(ptr, BOARD_PMSM0_WH_PWM_OUTPIN);
+   // pwmv2_channel_enable_output(ptr, BOARD_PMSM0_WL_PWM_OUTPIN);
 
 }
 void pwm_trigfor_adc_init(PWMV2_Type *ptr, uint32_t PWM_PRD, uint8_t CMP_SHADOW_REGISTER_UPDATE_TYPE, uint8_t CMP_COMPARE, uint8_t PWM_CH_TRIG_ADC)
 {
     
-    pwmv2_cmp_config_t cmp_config[4] = {0};
-    pwm_output_channel_t pwm_output_ch_cfg;
+    pwmv2_cmp_config_t cmp_config = {0};
+    pwmv2_config_t pwm_ch_cfg = {0};
 
 
     //cmp_config[2].enable_ex_cmp  = false;
-    cmp_config[2].enable_half_cmp = false;
-    cmp_config[2].enable_hrcmp = false;
-    cmp_config[2].mode           = CMP_COMPARE;
-    cmp_config[2].cmp = (PWM_PRD - 1);//PWM_PRD/2;
-    cmp_config[2].update_trigger = CMP_SHADOW_REGISTER_UPDATE_TYPE;
-    pwm_config_cmp(ptr, PWM_CH_TRIG_ADC, &cmp_config[2]);
+    cmp_config.enable_half_cmp = false;
+    cmp_config.enable_hrcmp = false;
+    cmp_config.mode           = CMP_COMPARE;
+    cmp_config.cmp = (PWM_PRD - 1);//PWM_PRD/2;
+    cmp_config.update_trigger = CMP_SHADOW_REGISTER_UPDATE_TYPE;
+    pwmv2_config_cmp(ptr, PWM_CH_TRIG_ADC, &cmp_config);
 
-    pwm_output_ch_cfg.cmp_start_index = PWM_CH_TRIG_ADC;
-    pwm_output_ch_cfg.cmp_end_index   = PWM_CH_TRIG_ADC;
-    pwm_output_ch_cfg.invert_output   = false;
-    pwm_config_output_channel(ptr, PWM_CH_TRIG_ADC, &pwm_output_ch_cfg);
+    /* 2. 手动配置 PWM 通道参数 (替代不存在的 get_default 函数) */
+    pwm_ch_cfg.enable_output = true;           // 显式使能输出
+    pwm_ch_cfg.invert_output = false;          // 注意：hpm_pwmv2_drv.h 中成员名是 invert_output 而不是 enable_invert
+    pwm_ch_cfg.fault_mode = pwm_fault_output_0;
+    pwm_ch_cfg.fault_recovery_trigger = pwm_fault_recovery_immediately;
+    pwm_ch_cfg.force_trigger = pwm_force_none;
+
+    /* 3. 设置波形 */
+    /* 参数说明: 硬件指针, 通道索引, 通道配置, 起始CMP索引, CMP配置指针, CMP数量 */
+    pwmv2_setup_waveform(ptr, 
+                         (pwm_channel_t)PWM_CH_TRIG_ADC, 
+                         &pwm_ch_cfg, 
+                         PWM_CH_TRIG_ADC, 
+                         &cmp_config, 
+                         1);
+
+    /* 4. 使能输出通道 */
+    pwmv2_channel_enable_output(ptr, (pwm_channel_t)PWM_CH_TRIG_ADC);
 
 
 }
@@ -345,7 +411,7 @@ void pwm_trigfor_currentctrl_init(PWMV2_Type *ptr, uint32_t PWM_PRD, uint8_t CMP
 {
     
     pwmv2_cmp_config_t pwm_trig_currentloop = {0};
-    pwm_output_channel_t pwm_output_ch_cfg;
+    pwmv2_config_t pwm_ch_cfg = {0};
  
     memset(&pwm_trig_currentloop, 0x00, sizeof(pwmv2_cmp_config_t));
     //pwm_trig_currentloop.enable_ex_cmp  = false;
@@ -356,15 +422,31 @@ void pwm_trigfor_currentctrl_init(PWMV2_Type *ptr, uint32_t PWM_PRD, uint8_t CMP
 
   
     pwm_trig_currentloop.update_trigger = CMP_SHADOW_REGISTER_UPDATE_TYPE;
-    pwm_config_cmp(ptr, PWM_CH_TRIG_CURRENTCtrl, &pwm_trig_currentloop);
+    pwmv2_config_cmp(ptr, PWM_CH_TRIG_CURRENTCtrl, &pwm_trig_currentloop);
   
-    pwm_output_ch_cfg.cmp_start_index = PWM_CH_TRIG_CURRENTCtrl;  
-    pwm_output_ch_cfg.cmp_end_index   = PWM_CH_TRIG_CURRENTCtrl; 
-    pwm_output_ch_cfg.invert_output   = false;
-    pwm_config_output_channel(ptr, PWM_CH_TRIG_CURRENTCtrl, &pwm_output_ch_cfg);
+    /* 2. 配置通道输出特性 */
+    pwm_ch_cfg.enable_output = true;
+    pwm_ch_cfg.invert_output = false; // 对应旧版的 invert_output
+    pwm_ch_cfg.fault_mode = pwm_fault_output_0;
+    pwm_ch_cfg.fault_recovery_trigger = pwm_fault_recovery_immediately;
+
+    /* 3. 使用 setup_waveform 关联通道与比较器并配置波形 */
+    /* 参数说明: 硬件指针, 通道索引, 通道配置, 起始CMP索引, CMP配置指针, CMP数量 */
+    pwmv2_setup_waveform(ptr, 
+                         (pwm_channel_t)PWM_CH_TRIG_CURRENTCtrl, 
+                         &pwm_ch_cfg, 
+                         PWM_CH_TRIG_CURRENTCtrl, 
+                         &pwm_trig_currentloop, 
+                         1);
+
+    /* 4. 使能输出通道 (PWMV2 必须显式使能) */
+    pwmv2_channel_enable_output(ptr, (pwm_channel_t)PWM_CH_TRIG_CURRENTCtrl);
+
+    /* 5. 启动计数器 (假设使用计数器 0，PWMV2 有 4 个独立计数器) */
+    pwmv2_enable_counter(ptr, pwm_counter_0);
     
-    pwm_start_counter(ptr);
-    pwm_issue_shadow_register_lock_event(ptr);
+    /* 6. 更新影子寄存器配置 */
+    pwmv2_issue_shadow_register_lock_event(ptr);
 
 }
 
@@ -788,7 +870,7 @@ void isr_speed_loop(void)
             motor.position_para.target = 0;
             motor.position_para.cur = 0;
             motor.position_para.mem = 0;
-            cmd_gene_disable(&CMDGENEObj.CMDGENE_UserObj); 
+            cmd_gene_disable((CMDGENE_USER_PARA*)(&CMDGENEObj.CMDGENE_UserObj)); 
 
         }
 #if !MOTORCONTROL_EC_OR_STUDIO

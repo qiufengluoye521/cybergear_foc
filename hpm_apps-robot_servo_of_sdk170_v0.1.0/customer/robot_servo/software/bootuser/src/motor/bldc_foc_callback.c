@@ -37,12 +37,20 @@ PWMV2_Type* motor_pwm_tbl[4] ={
 
 void bldc_pwm_enable(uint8_t motor_index,uint8_t pin_name)
 {
-  pwm_disable_pwm_sw_force_output(motor_pwm_tbl[motor_index],pwm_uvw_conversion_tbl[motor_index][pin_name]);
+    //pwm_disable_pwm_sw_force_output(motor_pwm_tbl[motor_index],pwm_uvw_conversion_tbl[motor_index][pin_name]);
+    /* 对应原来的 pwm_disable_pwm_sw_force_output */
+    /* 在 PWMV2 中，这通常意味着关闭软件强制输出，让 PWM 正常波形输出 */
+    pwmv2_disable_software_force(motor_pwm_tbl[motor_index], pwm_uvw_conversion_tbl[motor_index][pin_name]);
+    pwmv2_disable_force_by_software(motor_pwm_tbl[motor_index], pwm_uvw_conversion_tbl[motor_index][pin_name]);
 }
 
 void bldc_pwm_disable(uint8_t motor_index,uint8_t pin_name)
 {
-  pwm_enable_pwm_sw_force_output(motor_pwm_tbl[motor_index],pwm_uvw_conversion_tbl[motor_index][pin_name]);
+    //pwm_enable_pwm_sw_force_output(motor_pwm_tbl[motor_index],pwm_uvw_conversion_tbl[motor_index][pin_name]);
+    /* 对应原来的 pwm_enable_pwm_sw_force_output */
+    /* 在 PWMV2 中，这通常意味着启用软件强制输出，并配合 pwmv2_force_output 设置电平 */
+    pwmv2_enable_force_by_software(motor_pwm_tbl[motor_index], pwm_uvw_conversion_tbl[motor_index][pin_name]);
+    pwmv2_enable_software_force(motor_pwm_tbl[motor_index], pwm_uvw_conversion_tbl[motor_index][pin_name]);
 }
 /*
 void pwm_cmp_force_value_step(PWMV2_Type *pwm_x, uint8_t index, uint32_t cmp)

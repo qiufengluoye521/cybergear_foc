@@ -19,7 +19,7 @@
 
 #include "ecat_foe.h"
 #include "cia402appl.h"
-#include "pmsm_main.h"
+//#include "pmsm_main.h"
 
 extern bool foe_reset_request;
 
@@ -39,7 +39,7 @@ int hpm_ecat_cia402_foe_init(void)
 
      board_delay_ms(1000);
 #if defined(CONFIG_CIA402_USING_ACTUAL_MOTOR) && CONFIG_CIA402_USING_ACTUAL_MOTOR
-    motor_function_init(); /* motor function init */
+    ////motor_function_init(); /* motor function init */ TODO lhb
 #endif
 #endif
 #if MOTORCONTROL_EC_OR_STUDIO

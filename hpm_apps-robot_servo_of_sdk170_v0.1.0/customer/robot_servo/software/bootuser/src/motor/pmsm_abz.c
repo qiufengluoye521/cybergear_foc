@@ -28,6 +28,7 @@
 #include "cmd_gene.h"
 
 #include "hpm_qeiv2_drv.h"
+#include "monitor.h"
 
 extern MOTOR_CONTROL_Global Motor_Control_Global;
 
@@ -44,7 +45,7 @@ gpio_set_pin_output(HPM_GPIO0, GPIO_DO_GPIOF, 10);*/
 
     //HPM_IOC->PAD[IOC_PAD_PE15].FUNC_CTL = IOC_PE15_FUNC_CTL_GPIO_E_15;
     //gpio_set_pin_output(BOARD_LED_GPIO_CTRL, BOARD_LED_GPIO_INDEX, BOARD_LED_GPIO_PIN);
-monitor_init();
+    monitor_init();
     pmsm_motor1_init();
 
     intc_m_enable_irq_with_priority(BOARD_PMSM0APP_PWM_IRQ, 1);
