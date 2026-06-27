@@ -43,7 +43,12 @@ extern MEM_ADDR ESCMEM * pEsc;         /* pointer to the ESC */
 /* Read operation requires 4-byte alignment and reads 4 bytes at a time */
 #define     HW_EscRead(pData, Address, Len)             hw_esc_read_4bytes((UINT32 *) (pData), &((UINT32 ESCMEM *) pEsc)[((Address) >> 2)], (Len))
 #define     HW_EscReadIsr                               HW_EscRead
-#define     HW_EscReadDWord(DWordValue, Address)        ((DWordValue) = (((volatile UINT32 *) pEsc)[(Address >> 2)]))
+//#define     HW_EscReadDWord(DWordValue, Address)        ((DWordValue) = (((volatile UINT32 *) pEsc)[(Address >> 2)]))
+#define HW_EscReadDWord(DWordValue, Address)  \
+    do { \
+        (DWordValue) = (((volatile UINT32 *) pEsc)[((Address) >> 2)]); \
+        printf("HW_EscReadDWord add:0x%04x<--: 0x%08x\n", (Address), (DWordValue)); \
+    } while(0)
 #define     HW_EscReadDWordIsr(DWordValue, Address)     HW_EscReadDWord(DWordValue, Address)
 #define     HW_EscReadMbxMem(pData, Address, Len)       hw_esc_read_4bytes((UINT32 *) (pData), &((UINT32 ESCMEM *) pEsc)[((Address) >> 2)], (Len))
 

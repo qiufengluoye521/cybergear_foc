@@ -75,6 +75,7 @@ int main(void)
 
     //rgb_timer_create(LED_FLASH_PERIOD_IN_MS);
 
+    printf("main\n");
     printf("hello world, THIS OTA%d\n", hpm_ota_get_nowrunning_appindex());
 
 #ifndef CONFIG_USE_HPM5300

@@ -732,6 +732,7 @@ UINT16 StartInputHandler(void)
     pSyncMan = GetSyncMan(PROCESS_DATA_OUT);
     /* store the address of the Sync Manager Channel 2 (Outputs) */
     nEscAddrOutputData = (UINT16) (pSyncMan->AddressLength & SM_ADDRESS_MASK);
+    //printf("0x%04x,",nEscAddrOutputData);
     /* get the number of output buffer used for calculating the address areas */
     if (pSyncMan->Settings[SM_SETTING_CONTROL_OFFSET] & SM_SETTING_MODE_ONE_BUFFER_VALUE)
     {
@@ -784,12 +785,12 @@ UINT16 StartInputHandler(void)
     dcControl &=ESC_DC_SYNC_ACTIVATION_MASK;
 
     // Cycle time for Sync0
-        HW_EscReadDWord(cycleTimeSync0, ESC_DC_SYNC0_CYCLETIME_OFFSET);
-        cycleTimeSync0 = SWAPDWORD(cycleTimeSync0);
+    HW_EscReadDWord(cycleTimeSync0, ESC_DC_SYNC0_CYCLETIME_OFFSET);
+    cycleTimeSync0 = SWAPDWORD(cycleTimeSync0);
 
     // Cycle time for Sync1
-        HW_EscReadDWord(shiftTimeSync1, ESC_DC_SYNC1_CYCLETIME_OFFSET);
-        shiftTimeSync1 = SWAPDWORD(shiftTimeSync1);
+    HW_EscReadDWord(shiftTimeSync1, ESC_DC_SYNC1_CYCLETIME_OFFSET);
+    shiftTimeSync1 = SWAPDWORD(shiftTimeSync1);
 
 
     SyncType0x1C32 = sSyncManOutPar.u16SyncType;
@@ -1528,12 +1529,14 @@ void AL_ControlInd(UINT8 alControl, UINT16 alStatusCode)
     bApplEsmPending = TRUE;
 
     /* reset the Error Flag in case of acknowledge by the Master */
+    // 当从站当前存在错误 主站必须先下发一个“确认错误”的指令，从站才能继续切换状态
     if ( alControl & STATE_CHANGE )
     {
         bErrAck = 1;
-        nAlStatus &= ~STATE_CHANGE;
+        nAlStatus &= ~STATE_CHANGE; // 清除当前状态中的错误标志位
         /*enable SM2 is moved to state transition block. First check SM Settings.*/
     }
+    // 存在未确认故障，主机试图升态，直接拒绝指令
     else if ((nAlStatus & STATE_CHANGE)
         // HBu 17.04.08: the error has to be acknowledged before when sending the same (or a higher) state
         //               (the error was acknowledged with the same state before independent of the acknowledge flag)
@@ -1545,6 +1548,7 @@ void AL_ControlInd(UINT8 alControl, UINT16 alStatusCode)
            and the new state request will be ignored */
         return;
     }
+    // 无故障、无 ErrAck，正常清除 AL Status 多余位
     else
     {
         nAlStatus &= STATE_MASK;
@@ -1554,12 +1558,14 @@ void AL_ControlInd(UINT8 alControl, UINT16 alStatusCode)
 
     /* generate a variable for the state transition
       (Bit 0-3: new state (AL Control), Bit 4-7: old state (AL Status) */
+    // 拼接新旧状态，生成状态切换索引 stateTrans
     alControl &= STATE_MASK;
     stateTrans = nAlStatus;
     stateTrans <<= 4;
     stateTrans += alControl;
 
     /* check the SYNCM settings depending on the state transition */
+    // 在真正执行状态切换的业务逻辑之前，检查主站对同步管理器（SyncManager，简称 SM）的硬件配置是否正确
     switch ( stateTrans )
     {
     case INIT_2_PREOP:
@@ -1569,6 +1575,8 @@ void AL_ControlInd(UINT8 alControl, UINT16 alStatusCode)
         /* in PREOP only the SYNCM settings for SYNCM0 and SYNCM1 (mailbox)
            are checked, if result is unequal 0, the slave will stay in or
            switch to INIT and set the ErrorInd Bit (bit 4) of the AL-Status */
+        // SYNCM0/SYNCM1：邮箱通道（Mailbox），用于 CoE、FoE 配置通讯，PREOP 阶段必须可用
+        // 只检查 0、1 号同步管理器
         result = CheckSmSettings(MAILBOX_READ+1);
         break;
     case PREOP_2_SAFEOP:
@@ -1578,6 +1586,7 @@ void AL_ControlInd(UINT8 alControl, UINT16 alStatusCode)
             could be adapted (changed by PDO-Assign and/or PDO-Mapping)
             if result is unequal 0, the slave will stay in PREOP and set
             the ErrorInd Bit (bit 4) of the AL-Status */
+        // 进入 SAFEOP 前，先生成 PDO 映射
         result = APPL_GenerateMapping(&nPdInputSize,&nPdOutputSize);
 
             if (result != 0)
@@ -1592,11 +1601,14 @@ void AL_ControlInd(UINT8 alControl, UINT16 alStatusCode)
         /* in SAFEOP or OP the SYNCM settings for all SYNCM are checked
            if result is unequal 0, the slave will stay in or
            switch to PREOP and set the ErrorInd Bit (bit 4) of the AL-Status */
+        //SYNCM2/SYNCM3：过程数据通道（PDO），用于周期伺服控制，SAFEOP/OP 阶段必须可用
+        // 校验全部同步管理器
         result = CheckSmSettings(nMaxSyncMan);
         break;
 
     }
 
+    // SYNCM 同步管理器校验全部通过，无硬件 / PDO 配置错误
     if ( result == 0 )
     {
         /* execute the corresponding local management service(s) depending on the state transition */
@@ -2485,18 +2497,21 @@ void ECAT_StateChange(UINT8 alStatus, UINT16 alStatusCode)
     if(bEcatWaitForAlControlRes)
     {
         /*State transition is pending*/
-
+        // 通用协议栈掌控期，本地突发错误
         if(bApplEsmPending)
         {
             /*The generic stack has currently control of the state transition.
             In case on an local error force ESM timeout*/
+            // 应用层突然抛出了一个本地错误
             if(alStatusCode != 0)
             {
                 /*ECATCHANGE_START(V5.13) ESM1*/
-                u8LocalErrorState = (alStatus & STATE_MASK);
+                u8LocalErrorState = (alStatus & STATE_MASK);  // 记录发生错误时的原状态
                 /*ECATCHANGE_END(V5.13) ESM1*/
-                u16LocalErrorCode = alStatusCode;
-                EsmTimeoutCounter = 0;
+                u16LocalErrorCode = alStatusCode;             // 锁存错误码
+                // 通过将 EsmTimeoutCounter = 0，人为强制触发 EtherCAT 状态机超时。这样在下一个轮询周期，
+                // 协议栈就会认定本次状态转换失败，从而直接走错误退出流程
+                EsmTimeoutCounter = 0;                        // 极其粗暴且有效：直接将超时计数器清零！
             }
             else
             { 
@@ -2507,7 +2522,7 @@ void ECAT_StateChange(UINT8 alStatus, UINT16 alStatusCode)
         else
         {
             /*complete the state transition*/
-
+            // 状态转换失败
             if(alStatusCode != 0)
             {
                 /*ECATCHANGE_START(V5.13) ESM1*/
@@ -2516,27 +2531,32 @@ void ECAT_StateChange(UINT8 alStatus, UINT16 alStatusCode)
                 u16LocalErrorCode = alStatusCode;
 
                 /*State transition failed due to local application reasons*/
-                switch(nEcatStateTrans)
+                // 如果应用层在初始化过程中失败了
+                switch(nEcatStateTrans) // 当前转换状态
                 {
                     case INIT_2_PREOP:
                     case INIT_2_BOOT:
-                     
+                          // 倒车，关邮箱
                           APPL_StopMailboxHandler();
                           MBX_StopMailboxHandler();
                     break;
                     case PREOP_2_SAFEOP:
+                          // 倒车，关Input
                           APPL_StopInputHandler();
                           StopInputHandler();
                     break;
                     case SAFEOP_2_OP:
+                          // 倒车，关Output
                           APPL_StopOutputHandler();
                           StopOutputHandler();
                     break;
                 }
 
                 /*In case of a failed state transition the */
+                // nEcatStateTrans 高4位存储的是旧状态
                 Status =  (UINT8)(nEcatStateTrans >> 4);
             }
+            // 状态转换成功
             else
             {
                 /*State transition succeed*/
@@ -2545,17 +2565,17 @@ void ECAT_StateChange(UINT8 alStatus, UINT16 alStatusCode)
                 {
                     case INIT_2_PREOP:
                     case INIT_2_BOOT:
-                        bMbxRunning = TRUE;
+                        bMbxRunning = TRUE;   // 邮箱正式跑起来
                     break;
                     case PREOP_2_SAFEOP:
 /*ECATCHANGE_START(V5.13) ECAT1*/
 /*ECATCHANGE_END(V5.13) ECAT1*/
                         /* initialize the AL Event Mask register (0x204) */
                         SetALEventMask(u16ALEventMask);
-                        bEcatInputUpdateRunning = TRUE;
+                        bEcatInputUpdateRunning = TRUE;       // 允许 Input 更新，并开启事件中断
                     break;
                     case SAFEOP_2_OP:
-                          bEcatOutputUpdateRunning = TRUE;
+                          bEcatOutputUpdateRunning = TRUE;    // 允许 Output 更新
                     break;
                 }
 
@@ -2564,37 +2584,43 @@ void ECAT_StateChange(UINT8 alStatus, UINT16 alStatusCode)
                 Status =  (UINT8)(nEcatStateTrans & STATE_MASK);
             }
                 /*Pending state transition finished => write AL Status and AL Status Code*/
-                bEcatWaitForAlControlRes = FALSE;
+                bEcatWaitForAlControlRes = FALSE; // 清除等待标志，表示异步转换结束
 
                 if (alStatusCode != 0)
                 {
-                    Status |= STATE_CHANGE;
+                    Status |= STATE_CHANGE; // 如果失败，给状态打上 Error 标记（AL Status Bit 4）
                 }
 /*ECATCHANGE_START(V5.13) ECAT3*/
                 else if (u8LocalErrorState != 0)
                 {
                     /*a local error is cleared*/
                     /*ECATCHANGE_START(V5.13) ESM1*/
-                    u8LocalErrorState = 0;
+                    u8LocalErrorState = 0;      // 如果成功，顺便把之前的历史本地错误痕迹清空
                     /*ECATCHANGE_END(V5.13) ESM1*/
                     u16LocalErrorCode = 0x00;
                 }
 /*ECATCHANGE_END(V5.13) ECAT3*/
-
+                // 真正改写从站芯片的 0x0120 / 0x0130 寄存器
                 SetALStatus(Status,alStatusCode);
 
         }/*state transition need to be completed by the local application*/
     }/*State transition pending*/
+    // 当前没有挂起的状态转换
     else
     {
         /*ECATCHANGE_START(V5.13) ESM1*/
+        // 本地突发错误，实施紧急降级保护
+        // alStatusCode != 0：上层 / 总线上报存在故障（错误码非 0）
+        // ((alStatus & STATE_MASK) != STATE_OP) 主机要求切换到比 OP 更低的安全状态（SafeOP/PreOP/Init）
+        // STATE_VALID(alStatus)：目标状态是 EtherCAT 合法 ESM 状态
         if ( alStatusCode != 0 && ((alStatus & STATE_MASK) != STATE_OP) && STATE_VALID(alStatus))
         {
-            u8LocalErrorState = (alStatus & STATE_MASK);
+            u8LocalErrorState = (alStatus & STATE_MASK); // 记录发生故障时的状态
             /*ECATCHANGE_END(V5.13) ESM1*/
-            u16LocalErrorCode = alStatusCode;
+            u16LocalErrorCode = alStatusCode;            // 锁存错误码
 
             /*trigger state transition only state transition from OP to lower state (for all other transitions the corresponding state transition functions shall be used)*/
+            // 仅当从站当前处于OP运行态时，执行自动降级
             if ((nAlStatus & STATE_MASK) == STATE_OP)
             {
                /* no error pending and the target state is lower than the current one*/
@@ -2602,6 +2628,7 @@ void ECAT_StateChange(UINT8 alStatus, UINT16 alStatusCode)
             }
         }
         /*ECATCHANGE_START(V5.13) ESM1*/
+        // 上一层故障 if不满足（故障码 alStatusCode=0，代表故障消失）
         else if (u8LocalErrorState != 0)
         {
             /*a local error is gone*/

@@ -430,15 +430,60 @@ void hw_esc_read_4bytes(void *dest, const void *src, uint16_t size)
     uint16_t count = size / 4;       /* Number of 4-byte blocks to copy */
     uint16_t remainder = size % 4;   /* Remaining bytes after full 4-byte block copies */
     uint16_t index;
+    uint8_t  *p_print_buf = (uint8_t *)src;
+    uint16_t i = 0;
+    uint8_t  j = 0;
+    uint8_t print_flag = 0;
+    //if( (src != 0xf1701100) && (src != 0xf1700910) )
+    if( src == 0xf1701100 )
+    {
+      print_flag = 1;
+    }
+    else
+    {
+      print_flag = 0;
+    }
+    if(print_flag)
+    {
+      printf("hw_esc_read_4bytes add:0x%04x<--: ",src);
+    }
 
     /* Copy data in 4-byte chunks */
     for (index = 0; index < count; index++) {
         d[index] = s[index]; /* Always read in 4-byte */
+        //printf("0x%08x,",d[index]);
+    }
+    for(i = 0;i < size;i++)
+    {
+        //j = i % 4;
+        //switch(j)
+        //{
+        //  case 0:
+        //  break;
+        //  case 1:
+        //  break;
+        //  case 2:
+        //  break;
+        //  case 3:
+        //  break;
+        //  default:
+        //  break;
+        //}
+        if(print_flag)
+        {
+          printf("0x%02x,",*p_print_buf);
+        }
+        p_print_buf++;
     }
 
     /* Handle any remaining bytes after the last full 4-byte block */
     if (remainder > 0) {
         uint32_t last_4bytes = s[index]; /* Read the last 4-byte block */
         memcpy(&d[index], &last_4bytes, remainder); /* Copy only the remaining bytes */
+        //printf("0x%08x,",d[index]);
+    }
+    if(print_flag)
+    {
+      printf("\n");
     }
 }
