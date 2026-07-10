@@ -148,7 +148,7 @@ typedef struct OBJ_ENTRY
     struct OBJ_ENTRY                      *pPrev; /**< \brief Previous entry(object) in the object dictionary list*/
     struct OBJ_ENTRY                      *pNext; /**< \brief Next entry(object) in the object dictionary list*/
 
-    UINT16                                Index; /**< \brief Object index*/
+    UINT16                                Index; /**< \brief Object index 对象字典索引（如 0x1000、0x6040），排序依据*/
     TSDOINFOOBJDESC                       ObjDesc; /**< \brief Object access, type and code*/
     OBJCONST TSDOINFOENTRYDESC OBJMEM     *pEntryDesc; /**< \brief pointer to object entry descriptions*/
     OBJCONST UCHAR OBJMEM                 *pName; /**< \brief Pointer to object and entry names*/

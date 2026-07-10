@@ -724,6 +724,8 @@ UINT16 COE_AddObjectToDic(TOBJECT OBJMEM * pNewObjEntry)
 {
     if(pNewObjEntry != NULL)
     {
+        // ObjDicList 链表全局头指针
+        // 对象字典为空，空指针直接指向新元素
         if(ObjDicList == NULL)
         {
             /* Object dictionary is empty */
@@ -732,6 +734,7 @@ UINT16 COE_AddObjectToDic(TOBJECT OBJMEM * pNewObjEntry)
             ObjDicList->pPrev = NULL;
             return 0;
         }
+        // 新节点索引小于表头索引，插入链表头部  -- 链表保持升序
         else if(ObjDicList->Index > pNewObjEntry->Index)
         {
             /*insert new object dictionary head*/
@@ -741,16 +744,19 @@ UINT16 COE_AddObjectToDic(TOBJECT OBJMEM * pNewObjEntry)
             ObjDicList = pNewObjEntry;
             return 0;
         }
+        // 其他情况 遍历寻找插入位置
         else
         {
             TOBJECT    OBJMEM * pDicEntry = ObjDicList;
             while(pDicEntry != NULL)
             {
+                // 3.1  当前节点索引与新节点完全相等 → 重复对象，报错退出
                 if(pDicEntry->Index == pNewObjEntry->Index)
                 {
                     /*object already exists in object dictionary*/
                     return ALSTATUSCODE_UNSPECIFIEDERROR;
                 }
+                // 3.2 当前节点索引 > 新节点索引 → 在当前节点前插入
                 else if(pDicEntry->Index > pNewObjEntry->Index)
                 {
                     pNewObjEntry->pPrev = pDicEntry->pPrev;
@@ -763,6 +769,7 @@ UINT16 COE_AddObjectToDic(TOBJECT OBJMEM * pNewObjEntry)
 
                     return 0;
                 }
+                // 3.3 遍历到链表末尾，追加到尾部
                 else if(pDicEntry->pNext == NULL)
                 {
                     /*Last entry reached => add object to list tail*/
@@ -771,6 +778,7 @@ UINT16 COE_AddObjectToDic(TOBJECT OBJMEM * pNewObjEntry)
                     pNewObjEntry->pNext = NULL;
                     return 0;
                 }
+                // 3.4 以上条件均不满足，继续向后遍历
                 else
                 {
                     /*The new object index is smaller than the current index. Get next object handle.*/

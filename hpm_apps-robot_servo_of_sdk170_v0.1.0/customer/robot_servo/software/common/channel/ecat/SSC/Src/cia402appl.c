@@ -1251,17 +1251,22 @@ UINT16 APPL_GenerateMapping(UINT16* pInputSize,UINT16* pOutputSize)
     for(PDOAssignEntryCnt = 0; PDOAssignEntryCnt < sRxPDOassign.u16SubIndex0; PDOAssignEntryCnt++)
     {
         /*The PDO mapping objects are specified with an 0x10 offset => get the axis index*/
+        // AxisIndex：轴序号 sRxPDOassign ：对应 CoE 对象字典 0x1C12 RxPDO Assignment 的数据缓存
+        // aEntries[]：数组，每一项是主站写入的 PDO 分配 32 位条目
+        // PDOAssignEntryCnt：循环下标，代表当前是第 N 个 PDO 分配通道（0、1、2…）
+        // 1C12 高 4bit：AxisIndex 轴编号  低 4bit：PDO 映射子索引号（0x1600、0x1601…）
         AxisIndex = (sRxPDOassign.aEntries[PDOAssignEntryCnt] & 0xF0) >> 4;
 
         if(AxisIndex == PDOAssignEntryCnt)
         {
             /*Axis is mapped to process data check if axis objects need to be added to the object dictionary*/
-
+            // 只有标记为FALSE（未注册）时，才执行添加逻辑，防止重复调用COE_AddObjectToDic造成字典冲突、内存重复注册
             if(!LocalAxes[PDOAssignEntryCnt].bAxisIsActive)
             {
                 /*add objects to dictionary*/
                 pDiCEntry = LocalAxes[PDOAssignEntryCnt].ObjDic;
 
+                // 遍历当前轴全部对象字典条目，逐个注册(插入链表)
                 while(pDiCEntry->Index != 0xFFFF)
                 {
                     result = COE_AddObjectToDic(pDiCEntry);
