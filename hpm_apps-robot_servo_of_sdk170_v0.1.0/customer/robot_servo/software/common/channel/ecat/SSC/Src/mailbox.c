@@ -304,8 +304,9 @@ void MBX_Init(void)
 UINT16 MBX_StartMailboxHandler(void)
 {
     UINT16 result = 0;
-    
+    // 1. 抓取并缓存主站下发的邮箱硬件参数
     /* get address of the receive mailbox sync manager (SM0) */
+    // 获取物理 SM0 寄存器结构体指针，并从中读取邮箱大小和地址信息。
     TSYNCMAN ESCMEM * pSyncMan = (TSYNCMAN ESCMEM *)GetSyncMan(MAILBOX_WRITE);
 
     /* store size of the receive mailbox */
@@ -314,6 +315,7 @@ UINT16 MBX_StartMailboxHandler(void)
     u16EscAddrReceiveMbx = (UINT16) (pSyncMan->AddressLength & SM_ADDRESS_MASK);
 
     /* get address of the send mailbox sync manager (SM1) */
+    // 获取物理 SM1 寄存器结构体指针，并从中读取邮箱大小和地址信息。
     pSyncMan =(TSYNCMAN ESCMEM *) GetSyncMan(MAILBOX_READ);
 
     /* store the size of the send mailbox */
@@ -322,39 +324,48 @@ UINT16 MBX_StartMailboxHandler(void)
     u16EscAddrSendMbx = (UINT16) (pSyncMan->AddressLength & SM_ADDRESS_MASK);
 
     // HBu 02.05.06: it should be checked if there are overlaps in the sync manager areas
+    // 2.邮箱内存重叠检测
     if ((u16EscAddrReceiveMbx + u16ReceiveMbxSize) > u16EscAddrSendMbx && (u16EscAddrReceiveMbx < (u16EscAddrSendMbx + u16SendMbxSize)))
     {
         return ALSTATUSCODE_INVALIDMBXCFGINPREOP;
     }
 
+    //3. 动态计算 FoE（文件传输）单包最大载荷
+    // MBX_HEADER_SIZE（标准 EtherCAT 邮箱基础层报文头，固定 6 字节）
+    // SIZEOF(TFOEHEADER)（FoE 协议专属报文头，如 Opcode、Infoname/Errorcode 占用的字节）
     u16FoeMaxSendBlockSize = (u16SendMbxSize - SIZEOF(TFOEHEADER) - MBX_HEADER_SIZE);
 
     /* enable the receive mailbox sync manager channel */
+    //这个函数会真正去改写 ESC 芯片 -- 配置完成后，硬件数据链路层正式对主站张开大门， 主从站之间的 SDO (CoE) 通信通道在这一刻被正式激活
     EnableSyncManChannel(MAILBOX_WRITE);
     /* enable the send mailbox sync manager channel */
     EnableSyncManChannel(MAILBOX_READ);
 
-        psWriteMbx = (TMBX MBXMEM *) APPL_AllocMailboxBuffer(u16ReceiveMbxSize);
+    // 在真正的硬件通道开启前，对从站 MCU 的内存（RAM）进行一次动态申请测试，确保系统有足够的堆内存/缓冲区来处理主站发来的邮箱（Mailbox）报文
+    psWriteMbx = (TMBX MBXMEM *) APPL_AllocMailboxBuffer(u16ReceiveMbxSize);
+    // 内存不足时的“退化兜底”机制
+    if(psWriteMbx == NULL)
+    {
+        bNoMbxMemoryAvailable = TRUE;// 标记：当前无法支持正常大小的邮箱
+
+        //check if at least enough memory for an mailbox error is available (other wise stop the state transition)
+        // 从站需要向主站回传一个邮箱错误数据报文，这个标准错误报文的长度固定为 10 字节（6 字节邮箱头 + 4 字节错误控制项）
+        psWriteMbx = (TMBX MBXMEM *) APPL_AllocMailboxBuffer(10); /* a mailbox error datagram length*/
+        //但如果我连 10 字节的错误报文缓冲区都挤不出来，那我就彻底没救了，状态机必须立刻锁死在 INIT”
         if(psWriteMbx == NULL)
         {
-            bNoMbxMemoryAvailable = TRUE;
-
-            //check if at least enough memory for an mailbox error is available (other wise stop the state transition)
-            psWriteMbx = (TMBX MBXMEM *) APPL_AllocMailboxBuffer(10); /* a mailbox error datagram length*/
-            if(psWriteMbx == NULL)
-            {
-                result = ALSTATUSCODE_NOMEMORY;
-            }
-
-            APPL_FreeMailboxBuffer(psWriteMbx);
-            psWriteMbx = NULL;
+            result = ALSTATUSCODE_NOMEMORY;
         }
-        else
-        {
-            bNoMbxMemoryAvailable = FALSE;
-            APPL_FreeMailboxBuffer(psWriteMbx);
-            psWriteMbx = NULL;
-        }
+
+        APPL_FreeMailboxBuffer(psWriteMbx);
+        psWriteMbx = NULL;
+    }
+    else
+    {
+        bNoMbxMemoryAvailable = FALSE;// 内存充足，打上绿色标签 “内存充足，可以正常收发邮箱”
+        APPL_FreeMailboxBuffer(psWriteMbx);// 释放这次测试申请的内存
+        psWriteMbx = NULL;
+    }
 
     return result;
 }

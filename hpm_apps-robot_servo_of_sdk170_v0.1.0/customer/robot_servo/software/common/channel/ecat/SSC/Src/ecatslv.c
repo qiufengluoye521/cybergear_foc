@@ -422,6 +422,7 @@ UINT8    CheckSmSettings(UINT8 maxChannel)
 
 
         //Check if max address defines are within the available ESC address range
+        // 配置的地址范围> 硬件（ESC芯片）最大地址范围，则报错
         if ((nMaxEscAddress < MAX_PD_WRITE_ADDRESS)
             || (nMaxEscAddress < MAX_PD_READ_ADDRESS)
             || (nMaxEscAddress < MAX_MBX_WRITE_ADDRESS)
@@ -434,43 +435,52 @@ UINT8    CheckSmSettings(UINT8 maxChannel)
                 return ALSTATUSCODE_NOVALIDFIRMWARE;
         }
 
+    /* ----------------一、SM0 Write通道合法性校验------------------- */
     /* check the Sync Manager Parameter for the Receive Mailbox (Sync Manager Channel 0) */
     pSyncMan = GetSyncMan(MAILBOX_WRITE);
 
+    //右移操作（Shift）将其对齐归位，转化成真正的字节长度（例如标准邮箱长度 128 字节，即 0x0080）
     SMLength = (UINT16)((pSyncMan->AddressLength & SM_LENGTH_MASK) >> SM_LENGTH_SHIFT);
+    //通过低位掩码（Mask）过滤，直接把底层的物理起始地址（例如著名的邮箱起始地址 0x1000）剥离出来。
     SMAddress = (UINT16)(pSyncMan->AddressLength & SM_ADDRESS_MASK);
 
-
+    // 1.激活状态校验-检查主站是否激活了 SM0 通道。在 EtherCAT 状态机中，进入 PREOP 必须开启邮箱通信。如果主站在配置描述中把 SM0 禁用了（Enable 位为 0），从站直接拉闸
     if (!(pSyncMan->Settings[SM_SETTING_ACTIVATE_OFFSET] & SM_SETTING_ENABLE_VALUE))
     {
         /* receive mailbox is not enabled */
         result = ALSTATUSCODE_INVALIDMBXCFGINPREOP;
     }
+    // 2. 数据传输方向校验-SM0 是 主站写入、从站接收,控制字方向必须是 WRITE（对主站而言是写）。如果被错误地配置成了 READ（从站发送通道），则属于严重配置错误
     else if ((pSyncMan->Settings[SM_SETTING_CONTROL_OFFSET] & SM_SETTING_DIRECTION_MASK) != SM_SETTING_DIRECTION_WRITE_VALUE)
     {
         /* receive mailbox is not writable by the master*/
         result = ALSTATUSCODE_INVALIDMBXCFGINPREOP;
     }
+    //3. 通信模式校验- 主站和从站必须使用相同的通信模式。如果主站配置成了 ONE_BUFFER，从站配置成了 DOUBLE_BUFFER，则从站会一直处于等待状态，因为主站没有数据写入
     else if ((pSyncMan->Settings[SM_SETTING_CONTROL_OFFSET] & SM_SETTING_MODE_MASK) != SM_SETTING_MODE_ONE_BUFFER_VALUE)
     {
         /* receive mailbox is not in one buffer mode */
         result = ALSTATUSCODE_INVALIDMBXCFGINPREOP;
     }
+    // 4. 长度下限校验-如果主站分配的缓冲区太小，装不下最基本的 SDO 帧，直接拒绝
     else if (SMLength < MIN_MBX_SIZE)
     {
         /* receive mailbox size is too small */
         result = ALSTATUSCODE_INVALIDMBXCFGINPREOP;
     }
+    // 5.长度上限校验-如果主站分配的缓冲区太大，超过了从站的物理地址范围，则直接拒绝
     else if (SMLength > MAX_MBX_SIZE)
     {
         /* receive mailbox size is too great */
         result = ALSTATUSCODE_INVALIDMBXCFGINPREOP;
     }
+    // 6. 起始地址下限校验-如果主站分配的起始地址太小，超过了从站的物理地址范围，则直接拒绝 邮箱区一般从 0x1000 开始
     else if (SMAddress < MIN_MBX_WRITE_ADDRESS)
     {
         /* receive mailbox address is too small */
         result = ALSTATUSCODE_INVALIDMBXCFGINPREOP;
     }
+    // 7. 起始地址上限校验-如果主站分配的起始地址太大，超过了从站的物理地址范围，则直接拒绝
     else if (SMAddress > MAX_MBX_WRITE_ADDRESS)
     {
         /* receive mailbox address is too great */
@@ -480,69 +490,72 @@ UINT8    CheckSmSettings(UINT8 maxChannel)
 
     if ( result == 0 )
     {
+        /* ----------------二、SM1 Read通道合法性校验------------------- */
         /* check the Sync Manager Parameter for the Send Mailbox (Sync Manager Channel 1) */
         pSyncMan = GetSyncMan(MAILBOX_READ);
 
-    SMLength = (UINT16)((pSyncMan->AddressLength & SM_LENGTH_MASK) >> SM_LENGTH_SHIFT);
-    SMAddress = (UINT16)(pSyncMan->AddressLength & SM_ADDRESS_MASK);
+        SMLength = (UINT16)((pSyncMan->AddressLength & SM_LENGTH_MASK) >> SM_LENGTH_SHIFT);
+        SMAddress = (UINT16)(pSyncMan->AddressLength & SM_ADDRESS_MASK);
 
 
-    if (!(pSyncMan->Settings[SM_SETTING_ACTIVATE_OFFSET] & SM_SETTING_ENABLE_VALUE))
-    {
-        /* send mailbox is not enabled */
-        result = ALSTATUSCODE_INVALIDMBXCFGINPREOP;
-    }
-    else if ((pSyncMan->Settings[SM_SETTING_CONTROL_OFFSET] & SM_SETTING_DIRECTION_MASK) != SM_SETTING_DIRECTION_READ_VALUE)
-    {
-        /* receive mailbox is not readable by the master*/
-        result = ALSTATUSCODE_INVALIDMBXCFGINPREOP;
-    }
-    else if ((pSyncMan->Settings[SM_SETTING_CONTROL_OFFSET] & SM_SETTING_MODE_MASK) != SM_SETTING_MODE_ONE_BUFFER_VALUE)
-    {
-        /* receive mailbox is not in one buffer mode */
-        result = ALSTATUSCODE_INVALIDMBXCFGINPREOP;
-    }
-    else if (SMLength < MIN_MBX_SIZE)
-    {
-        /* send mailbox size is too small */
-        result = ALSTATUSCODE_INVALIDMBXCFGINPREOP;
-    }
-    else if (SMLength > MAX_MBX_SIZE)
-    {
-        /* send mailbox size is too great */
-        result = ALSTATUSCODE_INVALIDMBXCFGINPREOP;
-    }
-    else if (SMAddress < MIN_MBX_READ_ADDRESS)
-    {
-        /* send mailbox address is too small */
-        result = ALSTATUSCODE_INVALIDMBXCFGINPREOP;
-    }
-    else if (SMAddress > MAX_MBX_READ_ADDRESS)
-    {
-        /* send mailbox address is too great */
-        result = ALSTATUSCODE_INVALIDMBXCFGINPREOP;
-    }
+        if (!(pSyncMan->Settings[SM_SETTING_ACTIVATE_OFFSET] & SM_SETTING_ENABLE_VALUE))
+        {
+            /* send mailbox is not enabled */
+            result = ALSTATUSCODE_INVALIDMBXCFGINPREOP;
+        }
+        else if ((pSyncMan->Settings[SM_SETTING_CONTROL_OFFSET] & SM_SETTING_DIRECTION_MASK) != SM_SETTING_DIRECTION_READ_VALUE)
+        {
+            /* receive mailbox is not readable by the master*/
+            result = ALSTATUSCODE_INVALIDMBXCFGINPREOP;
+        }
+        else if ((pSyncMan->Settings[SM_SETTING_CONTROL_OFFSET] & SM_SETTING_MODE_MASK) != SM_SETTING_MODE_ONE_BUFFER_VALUE)
+        {
+            /* receive mailbox is not in one buffer mode */
+            result = ALSTATUSCODE_INVALIDMBXCFGINPREOP;
+        }
+        else if (SMLength < MIN_MBX_SIZE)
+        {
+            /* send mailbox size is too small */
+            result = ALSTATUSCODE_INVALIDMBXCFGINPREOP;
+        }
+        else if (SMLength > MAX_MBX_SIZE)
+        {
+            /* send mailbox size is too great */
+            result = ALSTATUSCODE_INVALIDMBXCFGINPREOP;
+        }
+        else if (SMAddress < MIN_MBX_READ_ADDRESS)
+        {
+            /* send mailbox address is too small */
+            result = ALSTATUSCODE_INVALIDMBXCFGINPREOP;
+        }
+        else if (SMAddress > MAX_MBX_READ_ADDRESS)
+        {
+            /* send mailbox address is too great */
+            result = ALSTATUSCODE_INVALIDMBXCFGINPREOP;
+        }
     }
 
     if ( result == 0 && maxChannel > PROCESS_DATA_IN )
     {
+        /* ----------------三、校验 Input PDO（从站输入过程数据通道，即 SM3）的参数合法性------------------- */
         /* b3BufferMode is only set, if inputs and outputs are running in 3-Buffer-Mode when leaving this function */
         b3BufferMode = TRUE;
         /* check the Sync Manager Parameter for the Inputs (Sync Manager Channel 2 (0 in case if no mailbox is supported)) */
         pSyncMan = GetSyncMan(PROCESS_DATA_IN);
 
-    SMLength = (UINT16)((pSyncMan->AddressLength & SM_LENGTH_MASK) >> SM_LENGTH_SHIFT);
-    SMAddress = (UINT16)(pSyncMan->AddressLength & SM_ADDRESS_MASK);
+        SMLength = (UINT16)((pSyncMan->AddressLength & SM_LENGTH_MASK) >> SM_LENGTH_SHIFT);
+        SMAddress = (UINT16)(pSyncMan->AddressLength & SM_ADDRESS_MASK);
 
-
-    if ((pSyncMan->Settings[SM_SETTING_ACTIVATE_OFFSET] & SM_SETTING_ENABLE_VALUE) != 0 && SMLength == 0)
-    {
-        /* the SM3 size is 0 and the SM3 is active */
-        result = SYNCMANCHSETTINGS + 1;
-    }
+        // 1：激活状态与长度的死逻辑冲突校验 激活了通道，长度却是0，则拒绝
+        if ((pSyncMan->Settings[SM_SETTING_ACTIVATE_OFFSET] & SM_SETTING_ENABLE_VALUE) != 0 && SMLength == 0)
+        {
+            /* the SM3 size is 0 and the SM3 is active */
+            result = SYNCMANCHSETTINGS + 1;
+        }
         else if (pSyncMan->Settings[SM_SETTING_ACTIVATE_OFFSET] & SM_SETTING_ENABLE_VALUE)
         {
-            /* Sync Manager Channel 3 is active, input size has to greater 0 */
+                /* Sync Manager Channel 3 is active, input size has to greater 0 */
+                // 2：数据长度的绝对一致性校验，SMLength：主站配置的长度，nPdInputSize：从站实际定义的 Input PDO 结构体字节数，二者必须一致。
                 if (SMLength != nPdInputSize || nPdInputSize == 0 || SMLength > MAX_PD_INPUT_SIZE)
                 {
                     /* sizes don't match */
@@ -550,21 +563,26 @@ UINT8    CheckSmSettings(UINT8 maxChannel)
                 }
                 else
                 {
+                    // 3：传输方向与动态地址锁定校验-
+                    // 一旦校验通过，从站会把这个地址记录到变量 nEscAddrInputData 中
                     /* sizes matches */
                     if ((pSyncMan->Settings[SM_SETTING_CONTROL_OFFSET] & SM_SETTING_DIRECTION_MASK) == SM_SETTING_DIRECTION_READ_VALUE)
                     {
                         /* settings match */
+                        // 在 PREOP 阶段：允许主站配置物理地址，只要在从站规划的物理区间（MIN_PD_READ_ADDRESS 到 MAX_PD_READ_ADDRESS）内即可。
+                        //      一旦校验通过，从站会把这个地址记录到变量 nEscAddrInputData 中
+                        // 在 SAFEOP 或 OP 阶段（nAlStatus != STATE_PREOP）：主站下发的地址必须死死等于之前在 PREOP 锁定的地址。
+                        //      如果主站在运行期间企图动态修改 PDO 的基地址，直接判定为非法操作并报错
                         if (((nAlStatus == STATE_PREOP) && (SMAddress >= MIN_PD_READ_ADDRESS) && (SMAddress <= MAX_PD_READ_ADDRESS))
                             || ((nAlStatus != STATE_PREOP) && (SMAddress == nEscAddrInputData))
                             )
                         {
                             /* addresses match */
-
-                                if ((pSyncMan->Settings[SM_SETTING_CONTROL_OFFSET] & SM_SETTING_MODE_MASK) == SM_SETTING_MODE_ONE_BUFFER_VALUE)
-                                {
-                                    /* inputs are running in 1-Buffer-Mode, reset flag b3BufferMode */
-                                    b3BufferMode = FALSE;
-                                }
+                            if ((pSyncMan->Settings[SM_SETTING_CONTROL_OFFSET] & SM_SETTING_MODE_MASK) == SM_SETTING_MODE_ONE_BUFFER_VALUE)
+                            {
+                                /* inputs are running in 1-Buffer-Mode, reset flag b3BufferMode */
+                                b3BufferMode = FALSE;
+                            }
                         }
                         else
                         {
@@ -586,38 +604,42 @@ UINT8    CheckSmSettings(UINT8 maxChannel)
         }
 
 
-
+        //如果在上面任何一步里给 result 赋了临时的内部错误标记（如 SYNCMANCHSIZE + 1），
+        // 代码最后会统一将其转换为 EtherCAT 官方规范标准的网路状态码：0x001E (Invalid SM IN Configuration)，并返回给主站
         if ( result != 0 )
         {
             result = ALSTATUSCODE_INVALIDSMINCFG;
         }
     }
 
-
-//    else
+    //    else
     if (result == 0 && maxChannel > PROCESS_DATA_OUT)
     {
+        /* ----------------四、校验 Output PDO（从站输出过程数据通道，即 SM2）的参数合法性------------------- */
         /* check the Sync Manager Parameter for the Outputs (Sync Manager Channel 2) */
         pSyncMan = GetSyncMan(PROCESS_DATA_OUT);
 
         SMLength = (UINT16)((pSyncMan->AddressLength & SM_LENGTH_MASK) >> SM_LENGTH_SHIFT);
         SMAddress = (UINT16)(pSyncMan->AddressLength & SM_ADDRESS_MASK);
 
-
-    if ((pSyncMan->Settings[SM_SETTING_ACTIVATE_OFFSET] & SM_SETTING_ENABLE_VALUE) != 0 && SMLength == 0)
-    {
-        /* the SM2 size is 0 and the SM2 is active */
-        result = SYNCMANCHSETTINGS + 1;
-    }
+        if ((pSyncMan->Settings[SM_SETTING_ACTIVATE_OFFSET] & SM_SETTING_ENABLE_VALUE) != 0 && SMLength == 0)
+        {
+            /* the SM2 size is 0 and the SM2 is active */
+            result = SYNCMANCHSETTINGS + 1;
+        }
         else if (pSyncMan->Settings[SM_SETTING_ACTIVATE_OFFSET] & SM_SETTING_ENABLE_VALUE)
         {
             /* Sync Manager Channel 2 is active, output size has to greater 0 */
+            // 主站在 ESI (XML) 文件或 TwinCAT 中配置的 RxPDO 映射总字节数（SMLength），必须与你 MCU 固件代码中定义的 RxPDO 结构体实际大小（nPdOutputSize）严格相等，
+            // 且不能超过芯片物理上限。少 1 个字节或者多 1 个字节都会产生 SYNCMANCHSIZE + 1 错误
             if ( SMLength == nPdOutputSize && nPdOutputSize != 0 && SMLength <= ((UINT16)MAX_PD_OUTPUT_SIZE))
             {
                 /* sizes match */
+                // SM2 必须被配置为 WRITE 传输方向。因为这是主站向从站写数据的通道
                 if ( (pSyncMan->Settings[SM_SETTING_CONTROL_OFFSET] & SM_SETTING_DIRECTION_MASK) == SM_SETTING_DIRECTION_WRITE_VALUE )
                 {
                     /* settings match */
+                    // 在 PREOP 阶段允许主站自由分配地址（在预设读写区间内）；一旦进入 SAFEOP 或 OP 阶段，主站下发的地址必须死死等于之前锁定的基地址
                     if ( ( ( nAlStatus == STATE_PREOP )&&( SMAddress >= MIN_PD_WRITE_ADDRESS )&&( SMAddress <= MAX_PD_WRITE_ADDRESS ) )
                        ||( ( nAlStatus != STATE_PREOP )&&( SMAddress == nEscAddrOutputData ) )
                         )
@@ -625,6 +647,9 @@ UINT8    CheckSmSettings(UINT8 maxChannel)
                         /* addresses match */
                         {
                             /* check, if watchdog trigger is enabled */
+                            // 为了防止主站死机或 EtherCAT 网线被拔掉导致电机失去控制（飞车），ESC 芯片引入了过程数据看门狗
+                            // 代码读取 SM2 的控制寄存器，如果主站在配置中开启了 SM_SETTING_WATCHDOG_VALUE，从站协议栈就会将全局变量 bWdTrigger 设为 TRUE。
+                            // 一旦后续运行中主站停止发包，ESC 硬件看门狗超时，会立即中断输出并把状态机拉回 SAFEOP，并迫使驱动器进入安全断电状态
                             if (pSyncMan->Settings[SM_SETTING_CONTROL_OFFSET] & SM_SETTING_WATCHDOG_VALUE)
                             {
                                 bWdTrigger = TRUE;
@@ -638,7 +663,7 @@ UINT8    CheckSmSettings(UINT8 maxChannel)
                             {
                                 /* outputs are running in 1-Buffer-Mode, reset flag b3BufferMode */
                                 b3BufferMode = FALSE;
-                                }
+                            }
                         }
                     }
                     else
@@ -664,7 +689,8 @@ UINT8    CheckSmSettings(UINT8 maxChannel)
             /* output size is not zero although the SM2 channel is not enabled */
             result = SYNCMANCHSIZE + 1;
         }
-
+        // 如果在上述任何一个分支（长度不符、方向配错、地址越界、死逻辑冲突）中被揪出问题，result 就不为 0，
+        // 代码会在末尾将其格式化为标准的 0x001D (Invalid SM OUT Configuration) 并向主站上报
         if ( result != 0 )
         {
             result = ALSTATUSCODE_INVALIDSMOUTCFG;
@@ -1588,7 +1614,6 @@ void AL_ControlInd(UINT8 alControl, UINT16 alStatusCode)
             the ErrorInd Bit (bit 4) of the AL-Status */
         // 进入 SAFEOP 前，先生成 PDO 映射
         result = APPL_GenerateMapping(&nPdInputSize,&nPdOutputSize);
-
             if (result != 0)
             {
                 break;
@@ -1605,7 +1630,6 @@ void AL_ControlInd(UINT8 alControl, UINT16 alStatusCode)
         // 校验全部同步管理器
         result = CheckSmSettings(nMaxSyncMan);
         break;
-
     }
 
     // SYNCM 同步管理器校验全部通过，无硬件 / PDO 配置错误
@@ -1613,6 +1637,7 @@ void AL_ControlInd(UINT8 alControl, UINT16 alStatusCode)
     {
         /* execute the corresponding local management service(s) depending on the state transition */
         nEcatStateTrans = 0;
+        // 前面的switch主要做校验，这里主要做执行
         switch ( stateTrans )
         {
         case INIT_2_BOOT    :
@@ -1625,8 +1650,8 @@ void AL_ControlInd(UINT8 alControl, UINT16 alStatusCode)
                 result = ALSTATUSCODE_INVALIDMBXCFGINBOOT;
                 break;
             }
-/*ECATCHANGE_START(V5.13) ECAT1*/
-/*ECATCHANGE_END(V5.13) ECAT1*/
+            /*ECATCHANGE_START(V5.13) ECAT1*/
+            /*ECATCHANGE_END(V5.13) ECAT1*/
             /* disable all events in BOOT state */
             ResetALEventMask(0);
 
@@ -1672,7 +1697,7 @@ void AL_ControlInd(UINT8 alControl, UINT16 alStatusCode)
 
 
             break;
-
+        // 当固件下载完成，或者主站发出复位指令要求退出升级模式时，就会触发 case BOOT_2_INIT
         case BOOT_2_INIT    :
             if(bBootMode)
             {
@@ -1680,11 +1705,15 @@ void AL_ControlInd(UINT8 alControl, UINT16 alStatusCode)
 /*ECATCHANGE_START(V5.13) ECAT1*/
 /*ECATCHANGE_END(V5.13) ECAT1*/
                 /* disable all events in BOOT state */
+                //这行代码会去改写 ESC 芯片的 AL Event Mask（应用层事件掩码寄存器，通常在地址 0x0204:0x0205）
                 ResetALEventMask(0);
+                //强行终止邮箱业务
+                // 在 BOOT 状态下，从站唯一开启的通信就是基于 FoE 的邮箱数据传输（用于接收固件镜像 bin 文件）
                 MBX_StopMailboxHandler();
+                // 从用户应用层通知底层的 Flash 烧录驱动程序：“传输已结束，可以关闭闪存的写使能锁了”
                 result = APPL_StopMailboxHandler();
             }
-
+            // 停止 Bootloader 物理动作
             BL_Stop();
 
             BackToInitTransition();
@@ -1692,8 +1721,10 @@ void AL_ControlInd(UINT8 alControl, UINT16 alStatusCode)
 
 
             break;
+        // 第一，确认 EEPROM（包含 Vendor ID、Product Code 等关键配置）正确加载；第二，正式初始化并开启邮箱（Mailbox）通信调度器
         case INIT_2_PREOP :
-
+            // EEPROM 里存放了该从站的 ESI 信息（EtherCAT Slave Information，如 PDI 类型、厂商信息、同步管理器默认分配等）。
+            // 如果硬件上 EEPROM 芯片坏了、网路电压不稳、或者主站刚刷写了新固件但没复位（导致加载失败），EepromLoaded 就会为 FALSE
            UpdateEEPROMLoadedState();
 
             if (EepromLoaded == FALSE)
@@ -1707,6 +1738,7 @@ void AL_ControlInd(UINT8 alControl, UINT16 alStatusCode)
                sync managers SYNCM0 and SYNCM1 overlap each other
               if result is unequal 0, the slave will stay in INIT
               and sets the ErrorInd Bit (bit 4) of the AL-Status */
+            // 启动“协议栈层”邮箱调度（开启 SDO 门道） 调用协议栈底层的邮箱启动函数
             result = MBX_StartMailboxHandler();
             if (result == 0)
             {
@@ -1715,6 +1747,7 @@ void AL_ControlInd(UINT8 alControl, UINT16 alStatusCode)
                    if the state transition from INIT to PREOP should be done
                  if result is unequal 0, the slave will stay in INIT
                  and sets the ErrorInd Bit (bit 4) of the AL-Status */
+                // 启动用户应用层邮箱服务（如 CoE/FoE 业务分配）
                 result = APPL_StartMailboxHandler();
                 if ( result == 0 )
                 {
@@ -1727,6 +1760,7 @@ void AL_ControlInd(UINT8 alControl, UINT16 alStatusCode)
                 /*Stop APPL Mbx handler if APPL Start Mbx handler was called before*/
                     if (!bApplEsmPending)
                     {
+                        // 回滚动作：如果满足条件，立刻调用 APPL_StopMailboxHandler() 和 MBX_StopMailboxHandler()，强行把已经打开的硬件和软件通道全部关闭
                         APPL_StopMailboxHandler();
                     }
 
@@ -1735,13 +1769,17 @@ void AL_ControlInd(UINT8 alControl, UINT16 alStatusCode)
 
             }
             break;
-
+        // 正式激活输入过程数据（TxPDO，即从站采集传感器或电机编码器数据并准备上传给主站），并正式导通 MCU 的底层硬件中断信号线。
         case PREOP_2_SAFEOP:
             /* start the input handler (function is defined above) */
+            // 启动协议栈层输入调度 
+            // StartInputHandler() 会真正将之前计算好的输入过程数据（TxPDO）的 RAM 地址和长度，正式映射到硬件底层的物理寄存器中，
+            // 告诉数据链路层：“我们现在随时准备把数据送入硬件缓冲区”
             result = StartInputHandler();
             if ( result == 0 )
             {
                 bApplEsmPending = FALSE;
+                // 开辟应用层输入通道并配置中断掩码
                 result = APPL_StartInputHandler(&u16ALEventMask);
 
                 if(result == 0)

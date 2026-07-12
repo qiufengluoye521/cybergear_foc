@@ -434,8 +434,9 @@ PROTO UINT16                            nPdInputSize; /**< \brief Contains the i
 
 PROTO UINT16                            nPdOutputSize; /**< \brief Contains the output size (SM2 size), has to be written by the application*/
 
-PROTO UINT8                             nMaxSyncMan; /**< \brief Contains the maximum number of Sync Manager channels, will be initialized in ECAT_Main*/
 
+PROTO UINT8                             nMaxSyncMan; /**< \brief Contains the maximum number of Sync Manager channels, will be initialized in ECAT_Main*/
+// 当前实际使用的 ESC 芯片可用最大地址 nMaxEscAddress （通常由从站驱动在初始化时从 ESC 硬件寄存器 0x0006:0x0007 读取）
 PROTO UINT16                            nMaxEscAddress; /**< \brief Max supported address by the ESC (register(0x1000) + size of the supported DPRAM in Byte)*/
 
 PROTO UINT8                             nAlStatus; /**< \brief Contains the actual AL Status, will be written in AL_ControlInd*/

@@ -966,7 +966,7 @@ inside the application memory of the EtherCAT Slave Controller which could be se
 MAX_PD_WRITE_ADDRESS: Maximum address for the process output data (Sync Manager 2)<br>
 inside the application memory of the EtherCAT Slave Controller which could be set by the master. The setting have to be within the ranges of the user memory of the ESC (this is not checked by the tool). */
 #ifndef MAX_PD_WRITE_ADDRESS
-#define MAX_PD_WRITE_ADDRESS                      0x2FFF
+#define MAX_PD_WRITE_ADDRESS                      0x2FFF //过程数据（PDO）写的最大预设物理地址
 #endif
 
 /** 
@@ -980,7 +980,7 @@ inside the application memory of the EtherCAT Slave Controller which could be se
 MAX_PD_READ_ADDRESS: Maximum address for the process input data (Sync Manager 3)<br>
 inside the application memory of the EtherCAT Slave Controller which could be set by the master. The setting have to be within the ranges of the user memory of the ESC (this is not checked by the tool). */
 #ifndef MAX_PD_READ_ADDRESS
-#define MAX_PD_READ_ADDRESS                       0x2FFF
+#define MAX_PD_READ_ADDRESS                       0x2FFF //过程数据（PDO）读的最大预设物理地址
 #endif
 
 /** 
@@ -1004,7 +1004,7 @@ MIN_MBX_WRITE_ADDRESS: Minimum address for the write (receive) mailbox (Sync Man
 /** 
 MAX_MBX_WRITE_ADDRESS: Maximum address for the write (receive) mailbox (Sync Manager 0). The setting have to be within the ranges of the user memory of the ESC (this is not checked by the tool). */
 #ifndef MAX_MBX_WRITE_ADDRESS
-#define MAX_MBX_WRITE_ADDRESS                     0x2FFF
+#define MAX_MBX_WRITE_ADDRESS                     0x2FFF  //邮箱数据（Mailbox/SDO）写的最大预设物理地址
 #endif
 
 /** 
@@ -1022,7 +1022,7 @@ MIN_MBX_READ_ADDRESS: Minimum address for the read (send) mailbox (Sync Manager 
 /** 
 MAX_MBX_READ_ADDRESS: Maximum address for the read (send) mailbox (Sync Manager 1). */
 #ifndef MAX_MBX_READ_ADDRESS
-#define MAX_MBX_READ_ADDRESS                      0x2FFF
+#define MAX_MBX_READ_ADDRESS                      0x2FFF  //邮箱数据（Mailbox/SDO）读的最大预设物理地址
 #endif
 
 /** 
