@@ -755,11 +755,14 @@ UINT16 StartInputHandler(void)
     bEcatFirstOutputsReceived = FALSE;
 
     /* get a pointer to the Sync Manager Channel 2 (Outputs) */
+    // 获取 SM2（输出 RxPDO）寄存器指针
     pSyncMan = GetSyncMan(PROCESS_DATA_OUT);
     /* store the address of the Sync Manager Channel 2 (Outputs) */
+    // 低 16 位 = SM 内存起始地址，高 16 位 = 长度
     nEscAddrOutputData = (UINT16) (pSyncMan->AddressLength & SM_ADDRESS_MASK);
     //printf("0x%04x,",nEscAddrOutputData);
     /* get the number of output buffer used for calculating the address areas */
+    // 若使能单缓冲模式 ONE_BUFFER，则输出缓冲区数量改为 1 -- 默认 3 缓冲,ESC 写缓冲 0，CPU 读缓冲 1，后台缓冲 2 轮换，实时性最高；
     if (pSyncMan->Settings[SM_SETTING_CONTROL_OFFSET] & SM_SETTING_MODE_ONE_BUFFER_VALUE)
     {
        nPdOutputBuffer = 1;
@@ -767,12 +770,15 @@ UINT16 StartInputHandler(void)
 
 
     /* get a pointer to the Sync Manager Channel 3 (Inputs) */
+    // 获取 SM3（输入 TxPDO，从站上传）寄存器指针
     pSyncMan = GetSyncMan(PROCESS_DATA_IN);
     /* store the address of the Sync Manager Channel 3 (Inputs)*/
+    // 低 16 位 = SM 内存起始地址，高 16 位 = 长度
     nEscAddrInputData = (UINT16) (pSyncMan->AddressLength & SM_ADDRESS_MASK);
 
 
     /* get the number of input buffer used for calculating the address areas */
+    // 若使能单缓冲模式 ONE_BUFFER，则输入缓冲区数量改为 1 -- 默认 3 缓冲,ESC 写缓冲 0，CPU 读缓冲 1，后台缓冲 2 轮换，实时性最高；
     if (pSyncMan->Settings[SM_SETTING_CONTROL_OFFSET] & SM_SETTING_MODE_ONE_BUFFER_VALUE)
     {
         nPdInputBuffer = 1;
@@ -780,6 +786,7 @@ UINT16 StartInputHandler(void)
     /* it has be checked if the Sync Manager memory areas for Inputs and Outputs will not overlap
        the Sync Manager memory areas for the Mailbox */
 
+    //  内存区间重叠检测
     if (((nEscAddrInputData + nPdInputSize * nPdInputBuffer) > u16EscAddrSendMbx && (nEscAddrInputData < (u16EscAddrSendMbx + u16SendMbxSize)))
        || ((nEscAddrInputData + nPdInputSize * nPdInputBuffer) > u16EscAddrReceiveMbx && (nEscAddrInputData < (u16EscAddrReceiveMbx + u16ReceiveMbxSize)))
         )
@@ -806,20 +813,29 @@ UINT16 StartInputHandler(void)
 
     /* Get the DC Control/Activation register value*/
      /*Read registers 0x980:0x983 (corresponding masks are adapted)*/
+    // DC 单元控制寄存器-存储 DC 时钟全局开关、Sync0/Sync1 信号使能、同步模式激活标志
     HW_EscReadDWord(dcControl, ESC_DC_UNIT_CONTROL_OFFSET);
     dcControl = SWAPDWORD(dcControl);
     dcControl &=ESC_DC_SYNC_ACTIVATION_MASK;
 
     // Cycle time for Sync0
+    // DC 基准中断 Sync0 的触发周期，单位 ns--伺服常用：1000000ns = 1ms 周期
     HW_EscReadDWord(cycleTimeSync0, ESC_DC_SYNC0_CYCLETIME_OFFSET);
     cycleTimeSync0 = SWAPDWORD(cycleTimeSync0);
 
     // Cycle time for Sync1
+    //  Sync1 信号相对 Sync0 的延时偏移（ns）-- 时序逻辑：Sync0 到达 → 等待 shiftTimeSync1 → 产生 Sync1
     HW_EscReadDWord(shiftTimeSync1, ESC_DC_SYNC1_CYCLETIME_OFFSET);
     shiftTimeSync1 = SWAPDWORD(shiftTimeSync1);
 
-
+    /* SyncType取值定义（标准 EtherCAT）：
+        - 0：FreeRun 自由运行（无 DC 同步，本地定时器刷新 PDO）
+        - 1: 1：Sync 仅 Sync0 同步
+        - 2: 2：DC 同步（Sync0+Sync1 双信号）
+    */
+    // 输出 SM2 同步参数结构体，u16SyncType对应对象字典 0x1C32
     SyncType0x1C32 = sSyncManOutPar.u16SyncType;
+    // 输入 SM3 同步参数结构体，u16SyncType对应对象字典 0x1C33
     SyncType0x1C33 = sSyncManInPar.u16SyncType;
 
 
@@ -829,15 +845,18 @@ UINT16 StartInputHandler(void)
        - 0x9A0:0x9A3 Sync0 Cycle
        - 0x9A4:0x9A7 Sync1 Cycle
     */
+    // DC 单元是否启用 ESC_DC_SYNC_UNIT_ACTIVE_MASK:DC 单元手动开启, ESC_DC_SYNC_UNIT_AUTO_ACTIVE_MASK:DC 单元自动激活
     if((dcControl & (ESC_DC_SYNC_UNIT_ACTIVE_MASK | ESC_DC_SYNC_UNIT_AUTO_ACTIVE_MASK)) != 0)
     {
         /* DC unit is active at least one Sync signal shall be generated */
+        // DC 开启后必须至少开启 Sync0 / Sync1 其中一路 才可继续往下进行
         if((dcControl & (ESC_DC_SYNC0_ACTIVE_MASK | ESC_DC_SYNC1_ACTIVE_MASK)) == 0)
         {
             return ALSTATUSCODE_DCINVALIDSYNCCFG;
         }
 
         /* If Sync1 shall only be active if also Sync0 will be generated*/
+        // 禁止只开 Sync1、不开 Sync0
         if(((dcControl & ESC_DC_SYNC0_ACTIVE_MASK) == 0)
             && ((dcControl & ESC_DC_SYNC1_ACTIVE_MASK) != 0))
         {
@@ -846,19 +865,24 @@ UINT16 StartInputHandler(void)
 
         if(u16MinSuppSyncType != 0)
         {
+            // 设备硬件不支持 Sync0，但 DC 寄存器强行打开 Sync0
+            // 设备硬件不支持 Sync1，但 DC 寄存器强行打开 Sync1--报错
             if((((u16MinSuppSyncType & SYNCTYPE_DCSYNC0SUPP) == 0) && ((dcControl & ESC_DC_SYNC0_ACTIVE_MASK) != 0))
                 ||(((u16MinSuppSyncType & SYNCTYPE_DCSYNC1SUPP) == 0) && ((dcControl & ESC_DC_SYNC1_ACTIVE_MASK) != 0)))
             {
                 /* Sync0 is not supported but will be generated*/
                 return ALSTATUSCODE_DCINVALIDSYNCCFG;                   
-    }
+            }
         }
 
         {
+            // 从站输出同步管理器支持的最小通信周期（来自对象字典 / 硬件参数）
             UINT32 curMinCycleTime = MIN_PD_CYCLE_TIME;
             curMinCycleTime = sSyncManOutPar.u32MinCycleTime;
 
             /*Check if Sync0 cycle time is supported*/
+            // Sync0 周期时间合法区间检查--
+            // DC 周期非单次触发模式 并且 Sync0 周期小于设备最小支持周期 或 超过最大允许周期报错
             if (cycleTimeSync0 != 0 && (cycleTimeSync0 < curMinCycleTime || cycleTimeSync0 > MAX_PD_CYCLE_TIME))
             {
                     return ALSTATUSCODE_DCSYNC0CYCLETIME;
@@ -867,6 +891,8 @@ UINT16 StartInputHandler(void)
 
 
         /* Check if Subordinated cycles are configured */
+        // 判定是否启用从属周期 Subordinated Cycles（采样与输出不在同一个周期，存在周期延迟，第 N 个 Sync0 采集的输入，要等到第 N+1 个周期之后的 Sync1 才输出控制
+        // -- 前置条件：Sync0、Sync1 两路同步信号同时开启
         if(((dcControl & ESC_DC_SYNC0_ACTIVE_MASK) != 0) && ((dcControl & ESC_DC_SYNC1_ACTIVE_MASK) != 0))
         {
             /* For Subordinated cycles both Sync signals shall be active and Sync0 is not configured in single shot (cycle time == 0)*/
@@ -877,6 +903,7 @@ UINT16 StartInputHandler(void)
         }
 
         /* Dump an error if subordinated cycles are configured but not supported */
+        // 开启从属周期时，设备必须支持该模式
         if(bSubordinatedCycles && ((u16MinSuppSyncType & SYNCTYPE_SUBCYCLESUPP) == 0))
         {
              return ALSTATUSCODE_DCINVALIDSYNCCFG;
@@ -887,8 +914,10 @@ UINT16 StartInputHandler(void)
     /*
         Check if the user configured Sync Type matches the DC register values (if the Sync Type is supported was already checked in the object write function)
     */
+    // 用户配置同步类型与 DC 硬件寄存器一致性校验
     if(bSyncSetByUser)
     {
+        // DC 硬件单元整体未开启
         if((dcControl & (ESC_DC_SYNC_UNIT_ACTIVE_MASK | ESC_DC_SYNC_UNIT_AUTO_ACTIVE_MASK)) == 0)
         {
             /* DC out unit not enabled => no DC mode shall be set */
@@ -898,8 +927,10 @@ UINT16 StartInputHandler(void)
                 return ALSTATUSCODE_DCINVALIDSYNCCFG;
             }
         } //if((dcControl & (ESC_DC_SYNC_UNIT_ACTIVE_MASK | ESC_DC_SYNC_UNIT_AUTO_ACTIVE_MASK)) == 0)
-    else
-    {
+        // DC 单元已开启，进入细分 Sync0/Sync1 匹配校验
+        else
+        {
+            // // 子校验1：硬件未开启Sync1，则SM不能配置DCSYNC1
             if((dcControl & ESC_DC_SYNC1_ACTIVE_MASK) == 0)
             {
                 /* No Sync 1 is generated => No Sync1 Sync Type shall configured*/
@@ -910,6 +941,7 @@ UINT16 StartInputHandler(void)
                 }
             } //if((dcControl & ESC_DC_SYNC1_ACTIVE_MASK) == 0)
 
+            // // 子校验2：硬件未开启Sync0，则SM不能配置DCSYNC0
             if((dcControl & ESC_DC_SYNC0_ACTIVE_MASK) == 0)
             {
                 /* No Sync 0 is generated => No Sync0 Sync Type shall configured*/
@@ -925,29 +957,34 @@ UINT16 StartInputHandler(void)
     else
     {
         /* No Sync Type selected by user => Configure Sync Type based on DC register values*/
+        // DC 完全禁用，只能使用 SM 邮箱同步 / FreeRun，分 4 种 PDO 组合自动分配
         if((dcControl & (ESC_DC_SYNC_UNIT_ACTIVE_MASK | ESC_DC_SYNC_UNIT_AUTO_ACTIVE_MASK)) == 0)
         {
             /* Activation or auto activation of the Sync Out Unit is disabled => Free Run or SM Sync is configured*/
 
             /* AL Event enabled => Configure SM Sync*/
+            // 场景 1：有输出 PDO nPdOutputSize > 0
             if (nPdOutputSize > 0)
             {
+                // // 输出SM：SM同步
                 SyncType0x1C32 = SYNCTYPE_SM_SYNCHRON;
                 
                 if (nPdInputSize > 0)
                 {
-                    SyncType0x1C33 = SYNCTYPE_SM2_SYNCHRON;
+                    SyncType0x1C33 = SYNCTYPE_SM2_SYNCHRON; // 输入跟随输出SM事件
                 }
                 else
                 {
-                    SyncType0x1C33 = SYNCTYPE_FREERUN;
+                    SyncType0x1C33 = SYNCTYPE_FREERUN;// 无输入PDO则自由运行
                 }
             }
+            // 场景 2：无输出、仅输入 PDO-- 输出通道 FreeRun，输入靠邮箱 SM 同步
             else if (nPdInputSize > 0)
             {
                 SyncType0x1C32 = SYNCTYPE_FREERUN;
                 SyncType0x1C33 = SYNCTYPE_SM_SYNCHRON;
             }
+            // 场景 3：无输入无输出（仅邮箱通讯）-- 全部自由运行，无过程数据同步需求。
             else
             {
                 SyncType0x1C32 = SYNCTYPE_FREERUN;
@@ -955,42 +992,44 @@ UINT16 StartInputHandler(void)
             }
 
         }
+        // DC 单元已激活（启用分布式时钟）
         else
         {
+            //  // 自动给输出SM2分配同步类型 SyncType0x1C32
             if (nPdOutputSize > 0)
             {
                 /* Sync Signal generation is active*/
                 if (bSubordinatedCycles)
                 {
-                    SyncType0x1C32 = SYNCTYPE_DCSYNC1;
+                    SyncType0x1C32 = SYNCTYPE_DCSYNC1;// 从属周期：输出绑定Sync1
                 }
                 else
                 {
-                    SyncType0x1C32 = SYNCTYPE_DCSYNC0;
+                    SyncType0x1C32 = SYNCTYPE_DCSYNC0;// 普通DC模式：输出绑定Sync0
                 }
             }
             else
             {
-                SyncType0x1C32 = SYNCTYPE_FREERUN;
+                SyncType0x1C32 = SYNCTYPE_FREERUN;// 无输出PDO则FreeRun
             }
 
-
+            // 自动给输入SM3分配同步类型 SyncType0x1C33
             if (nPdInputSize > 0)
             {
                 if ((dcControl & ESC_DC_SYNC1_ACTIVE_MASK) != 0)
                 {
                     /* If Sync1 is available the inputs will always be mapped with Sync1 */
-                    SyncType0x1C33 = SYNCTYPE_DCSYNC1;
+                    SyncType0x1C33 = SYNCTYPE_DCSYNC1;// 有Sync1脉冲，输入固定绑定Sync1
                 }
                 else
                 {
                     /* Map Inputs based on Sync0*/
-                    SyncType0x1C33 = SYNCTYPE_DCSYNC0;
+                    SyncType0x1C33 = SYNCTYPE_DCSYNC0;// 仅Sync0，输入绑定Sync
                 }
             }
             else
             {
-                SyncType0x1C33 = SYNCTYPE_FREERUN;
+                SyncType0x1C33 = SYNCTYPE_FREERUN;// 无输入PDO则FreeRun
             }
         }
     }
@@ -1778,6 +1817,7 @@ void AL_ControlInd(UINT8 alControl, UINT16 alStatusCode)
             result = StartInputHandler();
             if ( result == 0 )
             {
+                // 状态标记：清除「应用层 ESM 状态切换待处理」标志，代表底层协议栈初始化无阻塞，允许进入应用层配置
                 bApplEsmPending = FALSE;
                 // 开辟应用层输入通道并配置中断掩码
                 result = APPL_StartInputHandler(&u16ALEventMask);
@@ -1787,8 +1827,10 @@ void AL_ControlInd(UINT8 alControl, UINT16 alStatusCode)
 /*ECATCHANGE_START(V5.13) ECAT1*/
 /*ECATCHANGE_END(V5.13) ECAT1*/
                     /* initialize the AL Event Mask register (0x204) */
+                    // 配置AL事件掩码寄存器 0x204
                     SetALEventMask( u16ALEventMask );
 
+                    // 全局标志位：标记TxPDO 输入更新链路完整运行，应用主循环 / 中断中可据此判断是否能刷新过程数据
                     bEcatInputUpdateRunning = TRUE;
                 }
             }
@@ -1800,9 +1842,10 @@ void AL_ControlInd(UINT8 alControl, UINT16 alStatusCode)
                 {
                     /*Call only the APPL stop handler if the APPL start handler was called before*/
                     /*The application can react to the state transition in the function APPL_StopInputHandler */
+                    // 对应 APPL_StartInputHandler
                     APPL_StopInputHandler();
                 }
-
+                // 对应 StartInputHandler
                 StopInputHandler();
             }
             break;
@@ -1810,10 +1853,12 @@ void AL_ControlInd(UINT8 alControl, UINT16 alStatusCode)
         case SAFEOP_2_OP:
 /*ECATCHANGE_START(V5.13) ESM2*/
             /*enable SM if error was acknowledged*/
+            // 故障确认标志，主站下发错误清除命令后置 1--只有故障被确认清除，才允许打开过程数据同步管理器，故障未清禁止 PDO 通道打开，安全互锁
             if (bErrAck)
             {
                 if (nPdOutputSize > 0)
                 {
+                    // 使能输出同步管理器 SM，ESC 硬件开启 RxPDO 接收缓冲区，主站下发数据才能存入内存
                     EnableSyncManChannel(PROCESS_DATA_OUT);
                 }
                 else
@@ -1825,10 +1870,12 @@ void AL_ControlInd(UINT8 alControl, UINT16 alStatusCode)
             /*ECATCHANGE_END(V5.13) ESM2*/
 
             /* start the output handler (function is defined above) */
+            // 对应上一段 PreOP2SafeOP 的StartInputHandler，操作对象是RxPDO（主站输出）
             result = StartOutputHandler();
             if(result == 0)
             {
                 bApplEsmPending = FALSE;
+                // 对应上一段 APPL_StartInputHandler
                 result = APPL_StartOutputHandler();
 
                 if(result == 0)
@@ -1839,13 +1886,16 @@ void AL_ControlInd(UINT8 alControl, UINT16 alStatusCode)
 
             }
 
+            // 错误回滚、资源逆初始化逻辑（容错核心）
             if ( result != 0 && result != NOERROR_INWORK)
             {
                     if (!bApplEsmPending)
                     {
+                        // 对应 APPL_StartOutputHandler
                         APPL_StopOutputHandler();
                     }
 
+                // 对应 StartOutputHandler
                 StopOutputHandler();
             }
 
